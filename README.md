@@ -17,12 +17,25 @@ Developed by [n0rb33r7](https://github.com/n0rb33r7), [bastiaanv](https://github
 ## How to Add Eversense to Your AndroidAPS Dev Build
 
 ### Step 1 - Download the patches
+
 Click the green **Code** button on this page and select **Download ZIP**.
+
 Extract the ZIP somewhere on your computer, e.g. `C:\EversensePatches`
 
-### Step 2 - Open your AndroidAPS project in Android Studio
+### Step 2 - Switch to the dev branch
 
-### Step 3 - Apply the patches
+Before applying patches, make sure you are on the `dev` branch. In Android Studio:
+
+1. Look at the bottom right corner and click the branch name
+2. Find **origin/dev** in the list and click **Checkout**
+3. Wait for Android Studio to finish switching branches
+
+> **Note:** If you do not see `origin/dev`, click **Fetch** first.
+
+### Step 3 - Open your AndroidAPS project in Android Studio
+
+### Step 4 - Apply the patches
+
 Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
     git am C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
@@ -33,7 +46,8 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0006-Fix-suppress-Recalculated-Data-Used-warning-for-Ever.patch
     git am C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
 
-### Step 4 - Build
+### Step 5 - Build
+
 1. **File -> Sync Project with Gradle Files**
 2. **Build -> Make Project**
 3. **Run -> Run app** to install on your phone
@@ -67,5 +81,3 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
 - Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
-
-
