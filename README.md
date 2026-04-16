@@ -25,13 +25,13 @@ Extract the ZIP somewhere on your computer, e.g. `C:\EversensePatches`
 ### Step 3 - Apply the patches
 Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
-    git apply C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
-    git apply C:/EversensePatches/0002-E3-fixes-SingleByte-packets-force-sync-TOO_SOON-dark.patch
-    git apply C:/EversensePatches/0003-Fix-TOO_SOON-calibration-summary-display-in-dark-mod.patch
-    git apply C:/EversensePatches/0004-Sync-Eversense-plugin-to-latest-from-AndroidAPSEvers.patch
-    git apply C:/EversensePatches/0005-pushing-changes.patch
-    git apply C:/EversensePatches/0006-Fix-suppress-Recalculated-Data-Used-warning-for-Ever.patch
-    git apply C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
+    git am C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
+    git am C:/EversensePatches/0002-E3-fixes-SingleByte-packets-force-sync-TOO_SOON-dark.patch
+    git am C:/EversensePatches/0003-Fix-TOO_SOON-calibration-summary-display-in-dark-mod.patch
+    git am C:/EversensePatches/0004-Sync-Eversense-plugin-to-latest-from-AndroidAPSEvers.patch
+    git am C:/EversensePatches/0005-pushing-changes.patch
+    git am C:/EversensePatches/0006-Fix-suppress-Recalculated-Data-Used-warning-for-Ever.patch
+    git am C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
 
 ### Step 4 - Build
 1. **File -> Sync Project with Gradle Files**
@@ -67,4 +67,5 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
 - Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
+
 
