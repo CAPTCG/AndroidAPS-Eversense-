@@ -45,6 +45,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0005-pushing-changes.patch
     git am C:/EversensePatches/0006-Fix-suppress-Recalculated-Data-Used-warning-for-Ever.patch
     git am C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
+    git am C:/EversensePatches/0008-Add-EversenseStatusActivity-fix-plugin-registration-.patch
 
 ### Step 5 - Build
 
@@ -65,6 +66,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 | `0005` | Additional Eversense updates |
 | `0006` | Fix: suppress Recalculated Data Used yellow triangle warning for E3 and E365 |
 | `0007` | Fix: migrate EversensePlugin preferences to Compose API for latest dev branch |
+| `0008` | Add Eversense status activity, fix plugin registration, add credentials and calibration preferences |
 
 ---
 
@@ -81,3 +83,4 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
 - Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
+
