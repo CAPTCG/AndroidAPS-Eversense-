@@ -47,6 +47,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
     git am C:/EversensePatches/0008-Add-EversenseStatusActivity-fix-plugin-registration-.patch
     git am C:/EversensePatches/0009-Fix-remove-deprecated-pluginIcon-after-upstream-API-.patch
+    git am C:/EversensePatches/0010-Update-Eversense-add-icon-sign-out-calibration-info-.patch
 
 ### Step 5 - Build
 
@@ -69,6 +70,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 | `0007` | Fix: migrate EversensePlugin preferences to Compose API for latest dev branch |
 | `0008` | Add Eversense status activity, fix plugin registration, add credentials and calibration preferences |
 | `0009` | Fix: remove deprecated pluginIcon after upstream API change |
+| `0010` | Add Eversense icon, sign out, calibration info, placement signal label |
 
 ---
 
@@ -85,5 +87,6 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
 - Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
+
 
 
