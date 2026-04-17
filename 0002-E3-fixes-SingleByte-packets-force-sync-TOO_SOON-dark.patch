@@ -1,0 +1,386 @@
+From c0113487b750f422085b9a7e66017e37b9b239de Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sat, 4 Apr 2026 10:45:05 -0400
+Subject: [PATCH 2/9] E3 fixes: SingleByte packets, force sync, TOO_SOON dark
+ mode, calibration packet tests
+
+---
+ plugins/eversense/build.gradle.kts            |   3 +-
+ .../eversense/EversenseCGMPlugin.kt           |   8 +-
+ .../packets/EversenseE3Communicator.kt        |   8 +-
+ .../packets/e3/GetCalibrationPhasePacket.kt   |   7 +-
+ .../e3/GetCalibrationReadinessPacket.kt       |   6 +-
+ .../packets/e3/CalibrationPacketTest.kt       | 181 ++++++++++++++++++
+ .../aaps/plugins/source/EversensePlugin.kt    |   4 +-
+ .../source/src/main/res/values/strings.xml    |   3 +-
+ 8 files changed, 201 insertions(+), 19 deletions(-)
+ create mode 100644 plugins/eversense/src/test/kotlin/com/nightscout/eversense/packets/e3/CalibrationPacketTest.kt
+
+diff --git a/plugins/eversense/build.gradle.kts b/plugins/eversense/build.gradle.kts
+index 0c6e1f6b6a..e27d4713ea 100644
+--- a/plugins/eversense/build.gradle.kts
++++ b/plugins/eversense/build.gradle.kts
+@@ -3,6 +3,7 @@ plugins {
+     alias(libs.plugins.ksp)
+     id("kotlinx-serialization")
+     id("android-module-dependencies")
++    id("test-module-dependencies")
+ }
+ android {
+     namespace = "com.nightscout.eversense"
+@@ -15,4 +16,4 @@ dependencies {
+     api(libs.com.github.tony19.logback.android)
+     implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
+     implementation("org.bouncycastle:bcprov-jdk18on:1.81")
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseCGMPlugin.kt b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseCGMPlugin.kt
+index 48e4763c97..921e82d907 100644
+--- a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseCGMPlugin.kt
++++ b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseCGMPlugin.kt
+@@ -1,4 +1,4 @@
+-﻿package com.nightscout.eversense
++package com.nightscout.eversense
+ 
+ import android.annotation.SuppressLint
+ import android.bluetooth.BluetoothDevice
+@@ -234,7 +234,7 @@ class EversenseCGMPlugin {
+ 
+     // Triggers both a full sync and a glucose read on the connected transmitter.
+     // Should be called from a background thread (ioScope).
+-    fun triggerFullSync() {
++    fun triggerFullSync(force: Boolean = false) {
+         val gattCallback = this.gattCallback ?: run {
+             EversenseLogger.error(TAG, "Cannot sync — no gattCallback available")
+             return
+@@ -248,7 +248,7 @@ class EversenseCGMPlugin {
+             return
+         }
+         EversenseLogger.info(TAG, "Triggering full sync on user request")
+-        EversenseE3Communicator.fullSync(gattCallback, preferences, watchers.toList())
++        EversenseE3Communicator.fullSync(gattCallback, preferences, watchers.toList(), force)
+         EversenseE3Communicator.readGlucose(gattCallback, preferences, watchers.toList())
+         // Update placement signal after sync
+         gattCallback.readRssi()
+@@ -318,4 +318,4 @@ class EversenseCGMPlugin {
+             EversenseCGMPlugin()
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/EversenseE3Communicator.kt b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/EversenseE3Communicator.kt
+index 3c26044954..306e084bc4 100644
+--- a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/EversenseE3Communicator.kt
++++ b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/EversenseE3Communicator.kt
+@@ -1,4 +1,4 @@
+-﻿package com.nightscout.eversense.packets
++package com.nightscout.eversense.packets
+ 
+ import android.content.SharedPreferences
+ import android.os.Handler
+@@ -133,13 +133,13 @@ class EversenseE3Communicator {
+             }
+         }
+ 
+-        fun fullSync(gatt: EversenseGattCallback, preferences: SharedPreferences, watchers: List<EversenseWatcher>) {
++        fun fullSync(gatt: EversenseGattCallback, preferences: SharedPreferences, watchers: List<EversenseWatcher>, force: Boolean = false) {
+             try {
+                 val stateJson = preferences.getString(StorageKeys.STATE, null) ?: "{}"
+                 val state = JSON.decodeFromString<EversenseState>(stateJson)
+                 val fourHalfMinAgo = System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(270)
+ 
+-                if (fourHalfMinAgo < state.lastSync) {
++                if (!force && fourHalfMinAgo < state.lastSync) {
+                     EversenseLogger.warning(TAG, "State is still fresh - lastSync: ${state.lastSync}")
+                     return
+                 }
+@@ -296,4 +296,4 @@ class EversenseE3Communicator {
+             EversenseLogger.info(TAG, "Calibration sent successfully")
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationPhasePacket.kt b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationPhasePacket.kt
+index beea5d25fa..add48d5425 100644
+--- a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationPhasePacket.kt
++++ b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationPhasePacket.kt
+@@ -1,7 +1,6 @@
+ package com.nightscout.eversense.packets.e3
+ 
+ import com.nightscout.eversense.enums.CalibrationPhase
+-import com.nightscout.eversense.enums.CalibrationReadiness
+ import com.nightscout.eversense.enums.EversenseE3Memory
+ import com.nightscout.eversense.enums.EversenseSecurityType
+ import com.nightscout.eversense.packets.EversenseBasePacket
+@@ -9,8 +8,8 @@ import com.nightscout.eversense.packets.EversensePacket
+ import com.nightscout.eversense.packets.e3.util.EversenseE3Parser
+ 
+ @EversensePacket(
+-    requestId = EversenseE3Packets.ReadTwoByteSerialFlashRegisterCommandId,
+-    responseId = EversenseE3Packets.ReadTwoByteSerialFlashRegisterResponseId,
++    requestId = EversenseE3Packets.ReadSingleByteSerialFlashRegisterCommandId,
++    responseId = EversenseE3Packets.ReadSingleByteSerialFlashRegisterResponseId,
+     typeId = 0,
+     securityType = EversenseSecurityType.None
+ )
+@@ -29,4 +28,4 @@ class GetCalibrationPhasePacket : EversenseBasePacket() {
+     }
+ 
+     data class Response(val phase: CalibrationPhase) : EversenseBasePacket.Response()
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationReadinessPacket.kt b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationReadinessPacket.kt
+index 8a2ad1d30a..b85b564869 100644
+--- a/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationReadinessPacket.kt
++++ b/plugins/eversense/src/main/kotlin/com/nightscout/eversense/packets/e3/GetCalibrationReadinessPacket.kt
+@@ -8,8 +8,8 @@ import com.nightscout.eversense.packets.EversensePacket
+ import com.nightscout.eversense.packets.e3.util.EversenseE3Parser
+ 
+ @EversensePacket(
+-    requestId = EversenseE3Packets.ReadTwoByteSerialFlashRegisterCommandId,
+-    responseId = EversenseE3Packets.ReadTwoByteSerialFlashRegisterResponseId,
++    requestId = EversenseE3Packets.ReadSingleByteSerialFlashRegisterCommandId,
++    responseId = EversenseE3Packets.ReadSingleByteSerialFlashRegisterResponseId,
+     typeId = 0,
+     securityType = EversenseSecurityType.None
+ )
+@@ -28,4 +28,4 @@ class GetCalibrationReadinessPacket : EversenseBasePacket() {
+     }
+ 
+     data class Response(val readiness: CalibrationReadiness) : EversenseBasePacket.Response()
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/eversense/src/test/kotlin/com/nightscout/eversense/packets/e3/CalibrationPacketTest.kt b/plugins/eversense/src/test/kotlin/com/nightscout/eversense/packets/e3/CalibrationPacketTest.kt
+new file mode 100644
+index 0000000000..cd5cfaac5c
+--- /dev/null
++++ b/plugins/eversense/src/test/kotlin/com/nightscout/eversense/packets/e3/CalibrationPacketTest.kt
+@@ -0,0 +1,181 @@
++package com.nightscout.eversense.packets.e3
++
++import com.nightscout.eversense.enums.CalibrationPhase
++import com.nightscout.eversense.enums.CalibrationReadiness
++import org.junit.jupiter.api.Assertions.assertEquals
++import org.junit.jupiter.api.Assertions.assertNull
++import org.junit.jupiter.api.Test
++
++class GetCalibrationPhasePacketTest {
++
++    private fun makePacket(vararg bytes: Int): GetCalibrationPhasePacket {
++        val packet = GetCalibrationPhasePacket()
++        packet.appendData(bytes.map { it.toUByte() }.toUByteArray())
++        return packet
++    }
++
++    @Test
++    fun `empty receivedData returns null`() {
++        val packet = GetCalibrationPhasePacket()
++        assertNull(packet.parseResponse())
++    }
++
++    @Test
++    fun `value 1 parses to WARMING_UP`() {
++        val packet = makePacket(0, 0, 0, 0, 1)
++        assertEquals(CalibrationPhase.WARMING_UP, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 2 parses to DAILY_CALIBRATION`() {
++        val packet = makePacket(0, 0, 0, 0, 2)
++        assertEquals(CalibrationPhase.DAILY_CALIBRATION, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 3 parses to INITIALIZATION`() {
++        val packet = makePacket(0, 0, 0, 0, 3)
++        assertEquals(CalibrationPhase.INITIALIZATION, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 4 parses to SUSPICIOUS`() {
++        val packet = makePacket(0, 0, 0, 0, 4)
++        assertEquals(CalibrationPhase.SUSPICIOUS, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 5 parses to UNKNOWN`() {
++        val packet = makePacket(0, 0, 0, 0, 5)
++        assertEquals(CalibrationPhase.UNKNOWN, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 6 parses to DEBUG`() {
++        val packet = makePacket(0, 0, 0, 0, 6)
++        assertEquals(CalibrationPhase.DEBUG, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `value 7 parses to DROPOUT`() {
++        val packet = makePacket(0, 0, 0, 0, 7)
++        assertEquals(CalibrationPhase.DROPOUT, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `unknown value falls back to UNKNOWN`() {
++        val packet = makePacket(0, 0, 0, 0, 99)
++        assertEquals(CalibrationPhase.UNKNOWN, packet.parseResponse()?.phase)
++    }
++
++    @Test
++    fun `annotation uses SingleByte command id`() {
++        val annotation = GetCalibrationPhasePacket().getAnnotation()!!
++        assertEquals(EversenseE3Packets.ReadSingleByteSerialFlashRegisterCommandId, annotation.requestId)
++    }
++
++    @Test
++    fun `annotation uses SingleByte response id`() {
++        val annotation = GetCalibrationPhasePacket().getAnnotation()!!
++        assertEquals(EversenseE3Packets.ReadSingleByteSerialFlashRegisterResponseId, annotation.responseId)
++    }
++}
++
++class GetCalibrationReadinessPacketTest {
++
++    private fun makePacket(vararg bytes: Int): GetCalibrationReadinessPacket {
++        val packet = GetCalibrationReadinessPacket()
++        packet.appendData(bytes.map { it.toUByte() }.toUByteArray())
++        return packet
++    }
++
++    @Test
++    fun `empty receivedData returns null`() {
++        val packet = GetCalibrationReadinessPacket()
++        assertNull(packet.parseResponse())
++    }
++
++    @Test
++    fun `value 0 parses to READY`() {
++        val packet = makePacket(0, 0, 0, 0, 0)
++        assertEquals(CalibrationReadiness.READY, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 1 parses to NOT_ENOUGH_DATA`() {
++        val packet = makePacket(0, 0, 0, 0, 1)
++        assertEquals(CalibrationReadiness.NOT_ENOUGH_DATA, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 2 parses to GLUCOSE_TOO_HIGH`() {
++        val packet = makePacket(0, 0, 0, 0, 2)
++        assertEquals(CalibrationReadiness.GLUCOSE_TOO_HIGH, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 3 parses to TOO_SOON`() {
++        val packet = makePacket(0, 0, 0, 0, 3)
++        assertEquals(CalibrationReadiness.TOO_SOON, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 4 parses to DROPOUT_PHASE`() {
++        val packet = makePacket(0, 0, 0, 0, 4)
++        assertEquals(CalibrationReadiness.DROPOUT_PHASE, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 5 parses to SENSOR_EOL`() {
++        val packet = makePacket(0, 0, 0, 0, 5)
++        assertEquals(CalibrationReadiness.SENSOR_EOL, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 6 parses to NO_SENSOR_LINKED`() {
++        val packet = makePacket(0, 0, 0, 0, 6)
++        assertEquals(CalibrationReadiness.NO_SENSOR_LINKED, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 7 parses to UNSUPPORTED_MODE`() {
++        val packet = makePacket(0, 0, 0, 0, 7)
++        assertEquals(CalibrationReadiness.UNSUPPORTED_MODE, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 8 parses to CALIBRATING`() {
++        val packet = makePacket(0, 0, 0, 0, 8)
++        assertEquals(CalibrationReadiness.CALIBRATING, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 9 parses to LED_DISCONNECT_DETECTED`() {
++        val packet = makePacket(0, 0, 0, 0, 9)
++        assertEquals(CalibrationReadiness.LED_DISCONNECT_DETECTED, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `value 10 parses to TRANSMITTER_EOL`() {
++        val packet = makePacket(0, 0, 0, 0, 10)
++        assertEquals(CalibrationReadiness.TRANSMITTER_EOL, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `unknown value falls back to UNKNOWN`() {
++        val packet = makePacket(0, 0, 0, 0, 99)
++        assertEquals(CalibrationReadiness.UNKNOWN, packet.parseResponse()?.readiness)
++    }
++
++    @Test
++    fun `annotation uses SingleByte command id`() {
++        val annotation = GetCalibrationReadinessPacket().getAnnotation()!!
++        assertEquals(EversenseE3Packets.ReadSingleByteSerialFlashRegisterCommandId, annotation.requestId)
++    }
++
++    @Test
++    fun `annotation uses SingleByte response id`() {
++        val annotation = GetCalibrationReadinessPacket().getAnnotation()!!
++        assertEquals(EversenseE3Packets.ReadSingleByteSerialFlashRegisterResponseId, annotation.responseId)
++    }
++}
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+index 7dc68ecf37..1e12474f3c 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+@@ -262,7 +262,7 @@ class EversensePlugin @Inject constructor(
+             if (!eversense.isConnected()) {
+                 aapsLogger.warn(LTag.BGSOURCE, "Cannot trigger sync — not connected")
+             } else {
+-                eversense.triggerFullSync()
++                eversense.triggerFullSync(force = true)
+             }
+             true
+         }
+@@ -450,4 +450,4 @@ class EversensePlugin @Inject constructor(
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/plugins/source/src/main/res/values/strings.xml b/plugins/source/src/main/res/values/strings.xml
+index 9c7f7704e1..05d2ddcbdf 100644
+--- a/plugins/source/src/main/res/values/strings.xml
++++ b/plugins/source/src/main/res/values/strings.xml
+@@ -57,6 +57,7 @@
+     <string name="eversense_calibration_last">Last calibration</string>
+     <string name="eversense_calibration_next">Next calibration</string>
+     <string name="eversense_calibration_action">Calibrate transmitter</string>
++    <string name="eversense_calibration_too_soon">Too soon — calibration already done in the past 2 hours</string>
+     <string name="eversense_use_smoothing">Use ESEL Smoothing</string>
+     <!-- Credentials section for Eversense 365 DMS login -->
+     <string name="eversense_not_connected">Not connected</string>
+@@ -106,4 +107,4 @@
+     <string name="eversense_coexistence_summary">Automatically disconnect after each sync to give the official Eversense app time to connect and upload data</string>
+     <string name="eversense_transmitter_not_placed">Eversense transmitter not detecting — check placement</string>
+     <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
+-</resources>
+\ No newline at end of file
++</resources>
+-- 
+2.45.1.windows.1
+
