@@ -1,0 +1,30 @@
+From 163368b590dd2152e35bc828eb8611ee7be0a340 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Fri, 17 Apr 2026 10:19:12 -0400
+Subject: [PATCH 09/10] Fix: remove deprecated pluginIcon after upstream API
+ change
+
+---
+ .../src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt  | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+index a4d93a551f..07ee8640f8 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+@@ -72,7 +72,6 @@ class EversensePlugin @Inject constructor(
+                 title = rh.gs(R.string.source_eversense)
+             )
+         }
+-        .pluginIcon(app.aaps.core.objects.R.drawable.ic_blooddrop_48)
+         .pluginName(R.string.source_eversense)
+         .preferencesVisibleInSimpleMode(false)
+         .description(R.string.description_source_eversense),
+@@ -472,3 +471,4 @@ class EversensePlugin @Inject constructor(
+ 
+ 
+ 
++
+-- 
+2.45.1.windows.1
+
