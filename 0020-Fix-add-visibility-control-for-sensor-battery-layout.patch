@@ -1,0 +1,38 @@
+From 0a9fec7657687846e90e77540f02b3827c90bcc7 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sat, 18 Apr 2026 12:01:31 -0400
+Subject: [PATCH] Fix: add visibility control for sensor battery layout
+
+---
+ .../app/aaps/plugins/main/general/overview/OverviewFragment.kt  | 1 +
+ .../aaps/ui/compose/overview/statusLights/StatusViewModel.kt    | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt b/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
+index e749ca2909..986a9edd19 100644
+--- a/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
++++ b/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
+@@ -776,6 +776,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener {
+             val useBatteryLevel = (pump.model() == PumpType.OMNIPOD_EROS)
+                 || (pump.model() != PumpType.ACCU_CHEK_COMBO && pump.model() != PumpType.OMNIPOD_DASH)
+             pbLevel.visibility = useBatteryLevel.toVisibility()
++            sensorBatteryLayout.visibility = (activePlugin.activeBgSource.sensorBatteryLevel != -1).toVisibility()
+         }
+         statusLightHandler.updateStatusLights(
+             binding.statusLightsLayout.cannulaAge,
+diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
+index c11d38df16..c19aab6289 100644
+--- a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
++++ b/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
+@@ -137,7 +137,7 @@ class StatusViewModel @Inject constructor(
+             levelStatus = if (levelPercent >= 0) getLevelStatus((levelPercent * 100).toDouble(), IntKey.OverviewSbatWarning, IntKey.OverviewSbatCritical) else StatusLevel.UNSPECIFIED,
+             levelPercent = if (levelPercent >= 0) 1f - levelPercent else -1f,
+             icon = IcCgmInsert,
+-            compactLevel = false // Overview: sensor battery not shown
++            compactLevel = true // Overview: show sensor battery
+         )
+     }
+ 
+-- 
+2.45.1.windows.1
+

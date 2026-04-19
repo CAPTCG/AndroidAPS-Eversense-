@@ -1,0 +1,42 @@
+From d59f3101f87bd1f3d59e7e822d474343879d9ba2 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sun, 19 Apr 2026 08:32:02 -0400
+Subject: [PATCH] =?UTF-8?q?Remove=20Eversense=20activities=20from=20Activi?=
+ =?UTF-8?q?tiesModule=20=E2=80=94=20Hilt=20AndroidEntryPoint=20is=20auto-d?=
+ =?UTF-8?q?iscovered?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt b/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
+index 8a2eeb70ab..c8d6722073 100644
+--- a/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
++++ b/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
+@@ -2,10 +2,6 @@
+ 
+ import app.aaps.MainActivity
+ import app.aaps.activities.HistoryBrowseActivity
+-import app.aaps.plugins.source.activities.EversenseCalibrationActivity
+-import app.aaps.plugins.source.activities.EversensePlacementActivity
+-import app.aaps.plugins.source.activities.EversenseStatusActivity
+-import app.aaps.plugins.source.activities.RequestEversensePermissionActivity
+ import dagger.Module
+ import dagger.android.ContributesAndroidInjector
+ import dagger.hilt.InstallIn
+@@ -18,8 +14,4 @@ abstract class ActivitiesModule {
+ 
+     @ContributesAndroidInjector abstract fun contributesHistoryBrowseActivity(): HistoryBrowseActivity
+     @ContributesAndroidInjector abstract fun contributesMainActivity(): MainActivity
+-    @ContributesAndroidInjector abstract fun contributesEversenseCalibrationActivity(): EversenseCalibrationActivity
+-    @ContributesAndroidInjector abstract fun contributesEversensePlacementActivity(): EversensePlacementActivity
+-    @ContributesAndroidInjector abstract fun contributesEversenseStatusActivity(): EversenseStatusActivity
+-    @ContributesAndroidInjector abstract fun contributesRequestEversensePermissionActivity(): RequestEversensePermissionActivity
+ }
+\ No newline at end of file
+-- 
+2.45.1.windows.1
+

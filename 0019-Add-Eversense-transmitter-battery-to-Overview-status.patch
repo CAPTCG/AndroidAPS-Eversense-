@@ -1,0 +1,86 @@
+From 5dcc1aa43145340fc82f9f9ceb85e161a24e1490 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sat, 18 Apr 2026 11:25:46 -0400
+Subject: [PATCH] Add Eversense transmitter battery % to Overview status lights
+
+---
+ .../main/general/overview/OverviewFragment.kt |  2 +-
+ .../layout/overview_statuslights_layout.xml   | 25 +++++++++++++++++++
+ .../aaps/plugins/source/EversensePlugin.kt    |  5 ++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt b/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
+index 942b3dc0cd..e749ca2909 100644
+--- a/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
++++ b/plugins/main/src/main/kotlin/app/aaps/plugins/main/general/overview/OverviewFragment.kt
+@@ -783,7 +783,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener {
+             binding.statusLightsLayout.insulinAge,
+             binding.statusLightsLayout.reservoirLevel,
+             binding.statusLightsLayout.sensorAge,
+-            null,
++            binding.statusLightsLayout.sensorBatteryLevel,
+             binding.statusLightsLayout.pbAge,
+             binding.statusLightsLayout.pbLevel
+         )
+diff --git a/plugins/main/src/main/res/layout/overview_statuslights_layout.xml b/plugins/main/src/main/res/layout/overview_statuslights_layout.xml
+index f9a9c531ab..c8b22e845d 100644
+--- a/plugins/main/src/main/res/layout/overview_statuslights_layout.xml
++++ b/plugins/main/src/main/res/layout/overview_statuslights_layout.xml
+@@ -90,6 +90,31 @@
+ 
+     </LinearLayout>
+ 
++
++    <LinearLayout
++        android:id="@+id/sensor_battery_layout"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:focusable="true"
++        android:gravity="center"
++        tools:ignore="UseCompoundDrawables">
++
++        <ImageView
++            android:layout_width="28dp"
++            android:layout_height="28dp"
++            android:contentDescription="@string/sensor_label"
++            app:srcCompat="@drawable/ic_cp_age_sensor" />
++
++        <TextView
++            android:id="@+id/sensor_battery_level"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:lines="1"
++            android:paddingStart="2dp"
++            android:paddingEnd="0dp"
++            tools:text="85%" />
++
++    </LinearLayout>
+     <LinearLayout
+         android:id="@+id/battery_layout"
+         android:layout_width="wrap_content"
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+index dd91119b97..1792213a85 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+@@ -84,6 +84,8 @@ class EversensePlugin @Inject constructor(
+ 
+     @Inject lateinit var persistenceLayer: PersistenceLayer
+ 
++    override var sensorBatteryLevel = -1
++
+     private val mainHandler = Handler(Looper.getMainLooper())
+     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+@@ -226,6 +228,9 @@ class EversensePlugin @Inject constructor(
+     override fun onStateChanged(state: EversenseState) {
+         aapsLogger.info(LTag.BGSOURCE, "New state received: ${Json.encodeToString(state)}")
+ 
++        // Update sensor battery level for Overview status lights
++        sensorBatteryLevel = if (state.batteryPercentage > 0) state.batteryPercentage else -1
++
+         // Sync SAGE color thresholds to match Eversense sensor lifetime and notification days
+         if (state.insertionDate > 0) {
+             val lifetimeDays = if (eversense.is365()) 365 else 180
+-- 
+2.45.1.windows.1
+

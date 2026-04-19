@@ -48,6 +48,17 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0008-Add-EversenseStatusActivity-fix-plugin-registration-.patch
     git am C:/EversensePatches/0009-Fix-remove-deprecated-pluginIcon-after-upstream-API-.patch
     git am C:/EversensePatches/0010-Update-Eversense-add-icon-sign-out-calibration-info-.patch
+    git am C:/EversensePatches/0011-Fix-Eversense-DMS-upload-sync-credentials-from-AAPS-.patch
+    git am C:/EversensePatches/0012-Fix-AAPT-resource-linking-replace-attr-refs-with-dir.patch
+    git am C:/EversensePatches/0013-Remove-orphaned-source_item.xml-unused-after-upstrea.patch
+    git am C:/EversensePatches/0014-Register-Eversense-activities-in-ActivitiesModule-fo.patch
+    git am C:/EversensePatches/0015-Migrate-Eversense-activities-from-DaggerAppCompatAct.patch
+    git am C:/EversensePatches/0016-Remove-Eversense-activities-from-ActivitiesModule-Hi.patch
+    git am C:/EversensePatches/0017-Migrate-HistoryBrowseActivity-to-Hilt-AndroidEntryPo.patch
+    git am C:/EversensePatches/0018-Remove-ActivitiesModule-all-activities-use-Hilt-Andr.patch
+    git am C:/EversensePatches/0019-Add-Eversense-transmitter-battery-to-Overview-status.patch
+    git am C:/EversensePatches/0020-Fix-add-visibility-control-for-sensor-battery-layout.patch
+    git am C:/EversensePatches/0021-Fix-Eversense-DMS-portal-sync-add-putCurrentValues-a.patch
 
 ### Step 5 - Build
 
@@ -71,6 +82,17 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 | `0008` | Add Eversense status activity, fix plugin registration, add credentials and calibration preferences |
 | `0009` | Fix: remove deprecated pluginIcon after upstream API change |
 | `0010` | Add Eversense icon, sign out, calibration info, placement signal label |
+| `0011` | Fix Eversense DMS upload — sync credentials from AAPS prefs into SECURE_STATE |
+| `0012` | Fix AAPT resource linking — replace attr refs with direct colors in source_item.xml |
+| `0013` | Remove orphaned source_item.xml — unused after upstream Compose migration |
+| `0014` | Register Eversense activities in ActivitiesModule for Dagger injection |
+| `0015` | Migrate Eversense activities from DaggerAppCompatActivity to Hilt AndroidEntryPoint |
+| `0016` | Remove Eversense activities from ActivitiesModule — Hilt auto-discovers |
+| `0017` | Migrate HistoryBrowseActivity to Hilt AndroidEntryPoint, remove from ActivitiesModule |
+| `0018` | Remove ActivitiesModule — all activities use Hilt AndroidEntryPoint |
+| `0019` | Add Eversense transmitter battery % to Overview status lights |
+| `0020` | Fix: add visibility control for sensor battery layout, show battery in compact view |
+| `0021` | Fix Eversense DMS portal sync — add putCurrentValues and putDeviceEvents calls |
 
 ---
 

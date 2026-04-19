@@ -1,0 +1,33 @@
+From a5ebc67aa5c0396df6ec4fe6add9ff6ca605585d Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sun, 19 Apr 2026 08:38:54 -0400
+Subject: [PATCH] Migrate HistoryBrowseActivity to Hilt AndroidEntryPoint,
+ remove from ActivitiesModule
+
+---
+ app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt b/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
+index c8d6722073..6a5678bd2b 100644
+--- a/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
++++ b/app/src/main/kotlin/app/aaps/di/ActivitiesModule.kt
+@@ -1,7 +1,6 @@
+ ﻿package app.aaps.di
+ 
+ import app.aaps.MainActivity
+-import app.aaps.activities.HistoryBrowseActivity
+ import dagger.Module
+ import dagger.android.ContributesAndroidInjector
+ import dagger.hilt.InstallIn
+@@ -12,6 +11,5 @@ import dagger.hilt.components.SingletonComponent
+ @Suppress("unused")
+ abstract class ActivitiesModule {
+ 
+-    @ContributesAndroidInjector abstract fun contributesHistoryBrowseActivity(): HistoryBrowseActivity
+     @ContributesAndroidInjector abstract fun contributesMainActivity(): MainActivity
+ }
+\ No newline at end of file
+-- 
+2.45.1.windows.1
+

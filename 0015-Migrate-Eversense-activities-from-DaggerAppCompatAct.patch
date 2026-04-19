@@ -1,0 +1,96 @@
+From 96b42da58d73d80328e3634f7ade70cd74275f31 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sun, 19 Apr 2026 08:28:53 -0400
+Subject: [PATCH] Migrate Eversense activities from DaggerAppCompatActivity to
+ Hilt AndroidEntryPoint
+
+---
+ .../source/activities/EversenseCalibrationActivity.kt     | 8 +++++---
+ .../plugins/source/activities/EversenseStatusActivity.kt  | 8 +++++---
+ .../activities/RequestEversensePermissionActivity.kt      | 8 +++++---
+ 3 files changed, 15 insertions(+), 9 deletions(-)
+
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt
+index 081a23c129..c1d51eba32 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt
+@@ -1,4 +1,4 @@
+-package app.aaps.plugins.source.activities
++﻿package app.aaps.plugins.source.activities
+ 
+ import android.os.Bundle
+ import android.os.Handler
+@@ -11,7 +11,8 @@ import android.widget.TextView
+ import android.widget.Toast
+ import androidx.appcompat.widget.Toolbar
+ import app.aaps.core.interfaces.profile.ProfileUtil
+-import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
++import androidx.appcompat.app.AppCompatActivity
++import dagger.hilt.android.AndroidEntryPoint
+ import app.aaps.plugins.source.R
+ import com.nightscout.eversense.EversenseCGMPlugin
+ import com.nightscout.eversense.callbacks.EversenseWatcher
+@@ -23,7 +24,8 @@ import com.nightscout.eversense.models.EversenseState
+ import com.nightscout.eversense.util.EversenseLogger
+ import javax.inject.Inject
+ 
+-class EversenseCalibrationActivity : TranslatedDaggerAppCompatActivity() {
++@AndroidEntryPoint
++class EversenseCalibrationActivity : AppCompatActivity() {
+ 
+     @Inject lateinit var profileUtil: ProfileUtil
+ 
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
+index dfae245550..b8803f539a 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
+@@ -1,4 +1,4 @@
+-package app.aaps.plugins.source.activities
++﻿package app.aaps.plugins.source.activities
+ 
+ import android.content.Context
+ import android.os.Bundle
+@@ -9,7 +9,8 @@ import android.widget.Button
+ import android.widget.TextView
+ import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.widget.Toolbar
+-import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
++import androidx.appcompat.app.AppCompatActivity
++import dagger.hilt.android.AndroidEntryPoint
+ import app.aaps.plugins.source.R
+ import com.nightscout.eversense.EversenseCGMPlugin
+ import com.nightscout.eversense.callbacks.EversenseScanCallback
+@@ -22,7 +23,8 @@ import java.text.SimpleDateFormat
+ import java.util.Date
+ import java.util.Locale
+ 
+-class EversenseStatusActivity : TranslatedDaggerAppCompatActivity() {
++@AndroidEntryPoint
++class EversenseStatusActivity : AppCompatActivity() {
+ 
+     private val mainHandler = Handler(Looper.getMainLooper())
+     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/RequestEversensePermissionActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/RequestEversensePermissionActivity.kt
+index 85654f5732..39aca642ac 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/RequestEversensePermissionActivity.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/RequestEversensePermissionActivity.kt
+@@ -1,11 +1,13 @@
+-package app.aaps.plugins.source.activities
++﻿package app.aaps.plugins.source.activities
+ 
+ import android.Manifest
+ import android.os.Build
+ import android.os.Bundle
+-import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
++import androidx.appcompat.app.AppCompatActivity
++import dagger.hilt.android.AndroidEntryPoint
+ 
+-class RequestEversensePermissionActivity : TranslatedDaggerAppCompatActivity() {
++@AndroidEntryPoint
++class RequestEversensePermissionActivity : AppCompatActivity() {
+ 
+     private val requestCode = "EversenseBLE".map { it.code }.sum()
+ 
+-- 
+2.45.1.windows.1
+
