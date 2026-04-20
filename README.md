@@ -57,8 +57,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0017-Migrate-HistoryBrowseActivity-to-Hilt-AndroidEntryPo.patch
     git am C:/EversensePatches/0018-Remove-ActivitiesModule-all-activities-use-Hilt-Andr.patch
     git am C:/EversensePatches/0019-Add-Eversense-transmitter-battery-to-Overview-status.patch
-    git am C:/EversensePatches/0020-Fix-add-visibility-control-for-sensor-battery-layout.patch
-    git am C:/EversensePatches/0021-Fix-Eversense-DMS-portal-sync-add-putCurrentValues-a.patch
+    git am C:/EversensePatches/0020-Fix-Eversense-DMS-portal-sync-add-putCurrentValues-a.patch
 
 ### Step 5 - Build
 
@@ -90,9 +89,8 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 | `0016` | Remove Eversense activities from ActivitiesModule — Hilt auto-discovers |
 | `0017` | Migrate HistoryBrowseActivity to Hilt AndroidEntryPoint, remove from ActivitiesModule |
 | `0018` | Remove ActivitiesModule — all activities use Hilt AndroidEntryPoint |
-| `0019` | Add Eversense transmitter battery % to Overview status lights |
-| `0020` | Fix: add visibility control for sensor battery layout, show battery in compact view |
-| `0021` | Fix Eversense DMS portal sync — add putCurrentValues and putDeviceEvents calls |
+| `0019` | Add Eversense transmitter battery % to Overview status lights (Compose) |
+| `0020` | Fix Eversense DMS portal sync — add putCurrentValues and putDeviceEvents calls |
 
 ---
 
@@ -108,6 +106,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
+- Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
 
 
 
