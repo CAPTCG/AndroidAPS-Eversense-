@@ -58,6 +58,9 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
     git am C:/EversensePatches/0018-Remove-ActivitiesModule-all-activities-use-Hilt-Andr.patch
     git am C:/EversensePatches/0019-Add-Eversense-transmitter-battery-to-Overview-status.patch
     git am C:/EversensePatches/0020-Fix-Eversense-DMS-portal-sync-add-putCurrentValues-a.patch
+    git am C:/EversensePatches/0021-Add-putCurrentValues-and-putDeviceEvents-calls-for-E.patch
+    git am C:/EversensePatches/0022-Fix-Export-Settings-local-remove-instance-state-pend.patch
+    git am C:/EversensePatches/0023-Raise-transmitter-battery-default-thresholds-to-40-2.patch
 
 ### Step 5 - Build
 
@@ -91,6 +94,9 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 | `0018` | Remove ActivitiesModule — all activities use Hilt AndroidEntryPoint |
 | `0019` | Add Eversense transmitter battery % to Overview status lights (Compose) |
 | `0020` | Fix Eversense DMS portal sync — add putCurrentValues and putDeviceEvents calls |
+| `0021` | Add putCurrentValues and putDeviceEvents calls for E365 DMS uploads |
+| `0022` | Fix Export Settings local — remove instance-state pendingExportFile |
+| `0023` | Raise transmitter battery default thresholds to 40%/20% |
 
 ---
 

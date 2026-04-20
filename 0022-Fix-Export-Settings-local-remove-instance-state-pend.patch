@@ -1,0 +1,166 @@
+From cf854a1f8ce02bfa4f775650dcf9af35f4bc1009 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Sun, 19 Apr 2026 10:52:08 -0400
+Subject: [PATCH] =?UTF-8?q?Fix=20Export=20Settings=20local=20=E2=80=94=20r?=
+ =?UTF-8?q?emove=20instance-state=20pendingExportFile?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ExportPreparation now carries pendingFile (the DocumentFile created during
+prepareExport). MaintenanceViewModel caches the preparation and passes
+the file directly to executeExport, eliminating the @Reusable-scoped
+instance variable that was null when Hilt provided a different instance
+for the execute call.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+---
+ .../maintenance/ImportExportPrefs.kt           |  6 ++++--
+ .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
+ .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
+ 3 files changed, 21 insertions(+), 13 deletions(-)
+
+diff --git a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt
+index 9341b25797..19152f8214 100644
+--- a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt
++++ b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt
+@@ -1,6 +1,7 @@
+ package app.aaps.core.interfaces.maintenance
+ 
+ import android.content.Context
++import androidx.documentfile.provider.DocumentFile
+ import androidx.fragment.app.FragmentActivity
+ import app.aaps.core.interfaces.rx.weardata.CwfData
+ import org.json.JSONObject
+@@ -44,7 +45,8 @@ data class ExportPreparation(
+     val fileName: String,
+     val cachedPassword: String?,
+     val destination: ExportDestination = ExportDestination.LOCAL,
+-    val cloudDisplayName: String? = null
++    val cloudDisplayName: String? = null,
++    val pendingFile: DocumentFile? = null
+ )
+ 
+ interface ImportExportPrefs {
+@@ -65,7 +67,7 @@ interface ImportExportPrefs {
+     fun prepareExport(): ExportPreparation?
+ 
+     /** Execute the actual export with the given password. Returns per-destination results. */
+-    suspend fun executeExport(password: String): ExportResult
++    suspend fun executeExport(password: String, pendingFile: DocumentFile? = null): ExportResult
+ 
+     /** Cache the password for future exports. Returns the (possibly transformed) password to use. */
+     fun cacheExportPassword(password: String): String
+diff --git a/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt b/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
+index 1540f28a57..9da53f4a02 100644
+--- a/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
++++ b/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
+@@ -104,8 +104,6 @@ class ImportExportPrefsImpl @Inject constructor(
+     private val storage: Storage
+ ) : ImportExportPrefs {
+ 
+-    private var pendingExportFile: DocumentFile? = null
+-
+     // Compose export support — discrete steps
+ 
+     override fun isMasterPasswordSet(): Boolean =
+@@ -191,10 +189,10 @@ class ImportExportPrefsImpl @Inject constructor(
+         }
+ 
+         // For LOCAL / BOTH we need a local file
++        var newFile: DocumentFile? = null
+         if (destination != ExportDestination.CLOUD) {
+             prefFileList.ensureExportDirExists()
+-            val newFile = prefFileList.newPreferenceFile() ?: return null
+-            pendingExportFile = newFile
++            newFile = prefFileList.newPreferenceFile() ?: return null
+         }
+ 
+         val (password, isExpired, isAboutToExpire) = exportPasswordDataStore.getPasswordFromDataStore(context)
+@@ -205,19 +203,20 @@ class ImportExportPrefsImpl @Inject constructor(
+ 
+         val displayFileName = when (destination) {
+             ExportDestination.CLOUD -> config.cloudDisplayName ?: "Cloud"
+-            ExportDestination.BOTH  -> (pendingExportFile?.name ?: "unknown") + " + " + (config.cloudDisplayName ?: "Cloud")
+-            ExportDestination.LOCAL -> pendingExportFile?.name ?: "unknown"
++            ExportDestination.BOTH  -> (newFile?.name ?: "unknown") + " + " + (config.cloudDisplayName ?: "Cloud")
++            ExportDestination.LOCAL -> newFile?.name ?: "unknown"
+         }
+ 
+         return ExportPreparation(
+             fileName = displayFileName,
+             cachedPassword = cachedPassword,
+             destination = destination,
+-            cloudDisplayName = config.cloudDisplayName
++            cloudDisplayName = config.cloudDisplayName,
++            pendingFile = newFile
+         )
+     }
+ 
+-    override suspend fun executeExport(password: String): ExportResult {
++    override suspend fun executeExport(password: String, pendingFile: DocumentFile?): ExportResult {
+         val config = getExportConfig()
+         val localEnabled = config.settingsLocal
+         val cloudEnabled = config.settingsCloud && config.isCloudActive
+@@ -233,9 +232,8 @@ class ImportExportPrefsImpl @Inject constructor(
+ 
+         // Local export
+         if (destination == ExportDestination.LOCAL || destination == ExportDestination.BOTH) {
+-            val file = pendingExportFile
++            val file = pendingFile
+             if (file != null) {
+-                pendingExportFile = null
+                 localSuccess = savePreferences(file, password)
+                 val resultMessage = if (localSuccess) rh.gs(R.string.exported) else rh.gs(R.string.exported_failed)
+                 persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
+diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
+index 1cd5fe443b..15bfb27bc3 100644
+--- a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
++++ b/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
+@@ -17,6 +17,7 @@ import app.aaps.core.interfaces.maintenance.CloudDirectoryInfo
+ import app.aaps.core.interfaces.maintenance.CloudDirectoryManager
+ import app.aaps.core.interfaces.maintenance.ExportConfig
+ import app.aaps.core.interfaces.maintenance.ExportDestination
++import app.aaps.core.interfaces.maintenance.ExportPreparation
+ import app.aaps.core.interfaces.maintenance.ExportResult
+ import app.aaps.core.interfaces.maintenance.FileListProvider
+ import app.aaps.core.interfaces.maintenance.ImportExportPrefs
+@@ -366,6 +367,8 @@ class MaintenanceViewModel @Inject constructor(
+     private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
+ 
++    private var pendingPreparation: ExportPreparation? = null
++
+     fun startExport() {
+         uel.log(Action.EXPORT_SETTINGS, Sources.Maintenance)
+ 
+@@ -380,6 +383,8 @@ class MaintenanceViewModel @Inject constructor(
+             return
+         }
+ 
++        pendingPreparation = preparation
++
+         val cached = preparation.cachedPassword
+         if (cached != null) {
+             // Cached password available — export directly
+@@ -405,13 +410,16 @@ class MaintenanceViewModel @Inject constructor(
+     }
+ 
+     fun cancelExport() {
++        pendingPreparation = null
+         _exportState.value = ExportState.Idle
+     }
+ 
+     private fun doExport(password: String) {
++        val file = pendingPreparation?.pendingFile
++        pendingPreparation = null
+         viewModelScope.launch {
+             val result = withContext(Dispatchers.IO) {
+-                importExportPrefs.executeExport(password)
++                importExportPrefs.executeExport(password, file)
+             }
+             val message = buildExportResultMessage(result)
+             _events.emit(MaintenanceEvent.Snackbar(message))
+-- 
+2.45.1.windows.1
+

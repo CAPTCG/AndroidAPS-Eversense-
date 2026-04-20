@@ -1,0 +1,30 @@
+From e92ad8ecfc5a650a8c3ec140b8a3b8ba4cd1d869 Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Mon, 20 Apr 2026 06:00:58 -0400
+Subject: [PATCH] Raise transmitter battery default thresholds to 40%/20%
+
+Warning at 25% and critical at 5% were too low for practical use.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+---
+ core/keys/src/main/kotlin/app/aaps/core/keys/IntKey.kt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/core/keys/src/main/kotlin/app/aaps/core/keys/IntKey.kt b/core/keys/src/main/kotlin/app/aaps/core/keys/IntKey.kt
+index 9ec87d25c7..4266dde2a8 100644
+--- a/core/keys/src/main/kotlin/app/aaps/core/keys/IntKey.kt
++++ b/core/keys/src/main/kotlin/app/aaps/core/keys/IntKey.kt
+@@ -87,8 +87,8 @@ enum class IntKey(
+     ),
+     OverviewSageWarning(key = "statuslights_sage_warning", defaultValue = 216, min = 24, max = 720, titleResId = R.string.pref_title_sage_warning, defaultedBySM = true, unitType = UnitType.HOURS),
+     OverviewSageCritical(key = "statuslights_sage_critical", defaultValue = 240, min = 24, max = 720, titleResId = R.string.pref_title_sage_critical, defaultedBySM = true, unitType = UnitType.HOURS),
+-    OverviewSbatWarning(key = "statuslights_sbat_warning", defaultValue = 25, min = 0, max = 100, titleResId = R.string.pref_title_sbat_warning, defaultedBySM = true, unitType = UnitType.PERCENT),
+-    OverviewSbatCritical(key = "statuslights_sbat_critical", defaultValue = 5, min = 0, max = 100, titleResId = R.string.pref_title_sbat_critical, defaultedBySM = true, unitType = UnitType.PERCENT),
++    OverviewSbatWarning(key = "statuslights_sbat_warning", defaultValue = 40, min = 0, max = 100, titleResId = R.string.pref_title_sbat_warning, defaultedBySM = true, unitType = UnitType.PERCENT),
++    OverviewSbatCritical(key = "statuslights_sbat_critical", defaultValue = 20, min = 0, max = 100, titleResId = R.string.pref_title_sbat_critical, defaultedBySM = true, unitType = UnitType.PERCENT),
+     OverviewBageWarning(key = "statuslights_bage_warning", defaultValue = 216, min = 24, max = 1000, titleResId = R.string.pref_title_bage_warning, defaultedBySM = true, unitType = UnitType.HOURS),
+     OverviewBageCritical(key = "statuslights_bage_critical", defaultValue = 240, min = 24, max = 1000, titleResId = R.string.pref_title_bage_critical, defaultedBySM = true, unitType = UnitType.HOURS),
+     OverviewResWarning(key = "statuslights_res_warning", defaultValue = 80, min = 0, max = 300, titleResId = R.string.pref_title_res_warning, defaultedBySM = true, unitType = UnitType.INSULIN_INT),
+-- 
+2.45.1.windows.1
+
