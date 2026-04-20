@@ -1,34 +1,36 @@
-From fcd4e42aeef3ab9aee10f7d1e61c35cfe23490a9 Mon Sep 17 00:00:00 2001
+From ee81ebc8f1b4d0413df53f4f75bed93ed225c94b Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
-Date: Mon, 20 Apr 2026 09:26:41 +0000
+Date: Mon, 20 Apr 2026 18:25:49 +0000
 Subject: [PATCH] Add Eversense transmitter battery % to Overview status lights
 
 ---
- .../src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt | 3 +++
- .../aaps/ui/compose/overview/statusLights/StatusViewModel.kt   | 2 +-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ .../main/kotlin/app/aaps/plugins/source/EversensePlugin.kt   | 5 +++++
+ .../aaps/ui/compose/overview/statusLights/StatusViewModel.kt | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-index 35b24eab8b..8879fe26b6 100644
+index dc3a5199b8..87a8211bde 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-@@ -84,6 +84,7 @@ class EversensePlugin @Inject constructor(
+@@ -84,6 +84,8 @@ class EversensePlugin @Inject constructor(
  
      @Inject lateinit var persistenceLayer: PersistenceLayer
  
 +    override var sensorBatteryLevel = -1
- 
++
      private val mainHandler = Handler(Looper.getMainLooper())
      private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-@@ -227,6 +228,8 @@ class EversensePlugin @Inject constructor(
+     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+@@ -226,6 +228,9 @@ class EversensePlugin @Inject constructor(
      override fun onStateChanged(state: EversenseState) {
          aapsLogger.info(LTag.BGSOURCE, "New state received: ${Json.encodeToString(state)}")
  
 +        // Update sensor battery level for Overview status lights
 +        sensorBatteryLevel = if (state.batteryPercentage > 0) state.batteryPercentage else -1
- 
++
          // Sync SAGE color thresholds to match Eversense sensor lifetime and notification days
          if (state.insertionDate > 0) {
+             val lifetimeDays = if (eversense.is365()) 365 else 180
 diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
 index c11d38df16..c19aab6289 100644
 --- a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
@@ -44,4 +46,3 @@ index c11d38df16..c19aab6289 100644
  
 -- 
 2.43.0
-
