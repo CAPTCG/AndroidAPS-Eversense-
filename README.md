@@ -112,7 +112,6 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
-- Full build with Eversense: [CAPTCG/AndroidAPS-3.4.2.2-Eversense](https://github.com/CAPTCG/AndroidAPS-3.4.2.2-Eversense)
 
 
 
