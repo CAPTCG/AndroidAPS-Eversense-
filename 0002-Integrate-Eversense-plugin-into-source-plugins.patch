@@ -42,6 +42,7 @@ Subject: [PATCH 2/5] Integrate Eversense plugin into source plugins
  create mode 100644 plugins/source/src/main/res/values/colors.xml
 
 diff --git a/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt b/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt
+index 1f125288dc..aac623e273 100644
 --- a/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt
 +++ b/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt
 @@ -148,6 +148,9 @@ enum class BooleanKey(
@@ -55,6 +56,7 @@ diff --git a/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt b/core/k
      WizardCalculationVisible("wizard_calculation_visible", defaultValue = false, titleResId = R.string.pref_title_wizard_calculation_visible),
      WizardCorrectionPercent("wizard_correction_percent", defaultValue = false, titleResId = R.string.pref_title_wizard_correction_percent),
 diff --git a/core/keys/src/main/res/values/strings.xml b/core/keys/src/main/res/values/strings.xml
+index 730f6321a8..7c95f36f27 100644
 --- a/core/keys/src/main/res/values/strings.xml
 +++ b/core/keys/src/main/res/values/strings.xml
 @@ -465,4 +465,8 @@
