@@ -38,11 +38,12 @@ Before applying patches, make sure you are on the `dev` branch. In Android Studi
 
 Open the **Terminal** in Android Studio (bottom toolbar) and run each line in order:
 
-    git am C:/EversensePatches/0001-Add-Eversense-E3-365-BLE-driver-plugin.patch
-    git am C:/EversensePatches/0002-Integrate-Eversense-plugin-into-source-plugins.patch
-    git am C:/EversensePatches/0003-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
-    git am C:/EversensePatches/0004-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
-    git am C:/EversensePatches/0005-Maintenance-config-refactors-and-Eversense-related-C.patch
+    git am -3 C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
+    git am -3 C:/EversensePatches/0002-Add-BooleanKey-entries-for-Eversense-preferences.patch
+    git am -3 C:/EversensePatches/0003-Integrate-Eversense-plugin-into-source-plugins.patch
+    git am -3 C:/EversensePatches/0004-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
+    git am -3 C:/EversensePatches/0005-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
+    git am -3 C:/EversensePatches/0006-Maintenance-config-refactors-and-Eversense-related-C.patch
 
 ### Step 5 - Build
 
