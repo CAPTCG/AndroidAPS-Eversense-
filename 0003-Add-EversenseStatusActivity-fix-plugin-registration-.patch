@@ -552,7 +552,7 @@ index 84e64fba71..2266a00e06 100644
      <string name="eversense_use_smoothing">Use ESEL Smoothing</string>
      <!-- Credentials section for Eversense 365 DMS login -->
      <string name="eversense_not_connected">Not connected</string>
-@@ -113,4 +115,8 @@
+@@ -113,4 +115,5 @@
      <string name="eversense_coexistence_summary">Automatically disconnect after each sync to give the official Eversense app time to connect and upload data</string>
      <string name="eversense_transmitter_not_placed">Eversense transmitter not detecting — check placement</string>
      <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
@@ -561,4 +561,5 @@ index 84e64fba71..2266a00e06 100644
 +
 -- 
 2.45.1.windows.1
+
 
