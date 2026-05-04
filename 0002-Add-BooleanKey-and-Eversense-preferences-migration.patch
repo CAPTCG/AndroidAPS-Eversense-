@@ -366,16 +366,14 @@ index 84e64fba71..7c07b394b7 100644
      <!-- Credentials section for Eversense 365 DMS login -->
      <string name="eversense_not_connected">Not connected</string>
      <string name="eversense_credentials_title">Eversense 365 credentials</string>
-@@ -113,4 +115,7 @@
+@@ -113,4 +115,5 @@
      <string name="eversense_coexistence_summary">Automatically disconnect after each sync to give the official Eversense app time to connect and upload data</string>
      <string name="eversense_transmitter_not_placed">Eversense transmitter not detecting — check placement</string>
      <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
--</resources>
-\ No newline at end of file
-+</resources>
 +    <string name="eversense_reconnecting">Reconnecting…</string>
-+</resources>
+ </resources>
 +
 -- 
 2.45.1.windows.1
+
 
