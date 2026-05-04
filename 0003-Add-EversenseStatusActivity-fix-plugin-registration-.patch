@@ -462,10 +462,10 @@ index 7c07b394b7..d3adf71642 100644
      <string name="eversense_use_smoothing">Use ESEL Smoothing</string>
      <string name="eversense_cloud_upload_enabled">Enable Eversense cloud upload</string>
      <string name="eversense_cloud_upload_toast">Show cloud upload result</string>
-@@ -119,3 +121,4 @@
-     <string name="eversense_reconnecting">Reconnecting…</string>
+@@ -119,4 +121,5 @@
+     <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
++    <string name="eversense_reconnecting">Reconnecting…</string>
  </resources>
- 
 +
 -- 
 2.45.1.windows.1
