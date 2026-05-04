@@ -40,7 +40,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
 
     git am -3 C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
     git am -3 C:/EversensePatches/0002-Add-BooleanKey-entries-for-Eversense-preferences.patch
-    git am -3 C:/EversensePatches/0003-Integrate-Eversense-plugin-into-source-plugins.patch
+    git am -3 C:/EversensePatches/0003-Add-EversenseStatusActivity-fix-plugin-registration-.patch
     git am -3 C:/EversensePatches/0004-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
     git am -3 C:/EversensePatches/0005-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
     git am -3 C:/EversensePatches/0006-Maintenance-config-refactors-and-Eversense-related-C.patch
