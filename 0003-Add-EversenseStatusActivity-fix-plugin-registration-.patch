@@ -1,21 +1,23 @@
-From 6bfbd83e663b9c118bdf854a5a8a9c7ba1d9bf1b Mon Sep 17 00:00:00 2001
+From bbacbb972c61c9e90ab27b47b82abf56f0805858 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Fri, 17 Apr 2026 09:35:49 -0400
-Subject: [PATCH 3/3] Add EversenseStatusActivity, fix plugin registration, add
+Subject: [PATCH 3/6] Add EversenseStatusActivity, fix plugin registration, add
  credentials and calibration preferences
 
+Fix EversenseIntentKey: use May26 version with EversenseSignOut
+
+Fix strings.xml: add missing eversense_sign_out string
 ---
- .../kotlin/app/aaps/di/PluginsListModule.kt   |   8 +-
- plugins/source/src/main/AndroidManifest.xml   |   4 +-
- .../aaps/plugins/source/EversensePlugin.kt    |  23 ++-
- .../activities/EversenseStatusActivity.kt     | 159 ++++++++++++++++++
- .../aaps/plugins/source/di/SourceModule.kt    |   4 +-
- .../plugins/source/keys/EversenseIntentKey.kt |  36 ++++
- .../plugins/source/keys/EversenseStringKey.kt |  37 ++++
- .../res/layout/activity_eversense_status.xml  |  60 +++++++
- .../source/src/main/res/values/strings.xml    |   3 +
- 9 files changed, 329 insertions(+), 5 deletions(-)
- create mode 100644 plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
+ .../kotlin/app/aaps/di/PluginsListModule.kt   |  8 ++-
+ plugins/source/src/main/AndroidManifest.xml   |  4 +-
+ .../aaps/plugins/source/EversensePlugin.kt    | 23 ++++++-
+ .../activities/EversenseStatusActivity.kt     |  6 +-
+ .../aaps/plugins/source/di/SourceModule.kt    |  4 +-
+ .../plugins/source/keys/EversenseIntentKey.kt | 43 +++++++++++++
+ .../plugins/source/keys/EversenseStringKey.kt | 37 ++++++++++++
+ .../res/layout/activity_eversense_status.xml  | 60 +++++++++++++++++++
+ .../source/src/main/res/values/strings.xml    |  5 +-
+ 9 files changed, 180 insertions(+), 10 deletions(-)
  create mode 100644 plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseIntentKey.kt
  create mode 100644 plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseStringKey.kt
  create mode 100644 plugins/source/src/main/res/layout/activity_eversense_status.xml
@@ -107,170 +109,40 @@ index 14b5da5102..9787553ec2 100644
 +
 +
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
-new file mode 100644
-index 0000000000..6e688c9a17
---- /dev/null
+index 72b013457b..6e688c9a17 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
-@@ -0,0 +1,159 @@
-+package app.aaps.plugins.source.activities
-+
-+import android.content.Context
-+import android.os.Bundle
-+import android.os.Handler
-+import android.os.Looper
-+import android.view.MenuItem
-+import android.widget.Button
-+import android.widget.TextView
-+import androidx.appcompat.app.AlertDialog
-+import androidx.appcompat.widget.Toolbar
+@@ -1,7 +1,6 @@
+ package app.aaps.plugins.source.activities
+ 
+ import android.content.Context
+-import androidx.appcompat.app.AppCompatActivity
+ import android.os.Bundle
+ import android.os.Handler
+ import android.os.Looper
+@@ -10,6 +9,7 @@ import android.widget.Button
+ import android.widget.TextView
+ import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.widget.Toolbar
 +import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
-+import app.aaps.plugins.source.R
-+import com.nightscout.eversense.EversenseCGMPlugin
-+import com.nightscout.eversense.callbacks.EversenseScanCallback
-+import com.nightscout.eversense.models.EversenseScanResult
-+import kotlinx.coroutines.CoroutineScope
-+import kotlinx.coroutines.Dispatchers
-+import kotlinx.coroutines.SupervisorJob
-+import kotlinx.coroutines.launch
-+import java.text.SimpleDateFormat
-+import java.util.Date
-+import java.util.Locale
-+
+ import app.aaps.plugins.source.R
+ import com.nightscout.eversense.EversenseCGMPlugin
+ import com.nightscout.eversense.callbacks.EversenseScanCallback
+@@ -22,7 +22,7 @@ import java.text.SimpleDateFormat
+ import java.util.Date
+ import java.util.Locale
+ 
+-class EversenseStatusActivity : AppCompatActivity() {
 +class EversenseStatusActivity : TranslatedDaggerAppCompatActivity() {
-+
-+    private val mainHandler = Handler(Looper.getMainLooper())
-+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-+    private val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-+    private val eversense get() = EversenseCGMPlugin.instance
-+
-+    override fun onCreate(savedInstanceState: Bundle?) {
-+        super.onCreate(savedInstanceState)
-+        setContentView(R.layout.activity_eversense_status)
-+
-+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-+        setSupportActionBar(toolbar)
-+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-+        supportActionBar?.title = "Eversense Status"
-+
-+        updateStatus()
-+
-+        findViewById<Button>(R.id.eversense_btn_connect).setOnClickListener {
-+            handleConnectTap()
-+        }
-+
-+        findViewById<Button>(R.id.eversense_btn_sync).setOnClickListener {
-+            if (eversense.isConnected()) {
-+                ioScope.launch { eversense.triggerFullSync(force = true) }
-+                updateStatus()
-+            }
-+        }
-+    }
-+
-+    private fun updateStatus() {
-+        val state = eversense.getCurrentState()
-+        val notConnected = getString(R.string.eversense_not_connected)
-+
-+        findViewById<TextView>(R.id.eversense_status_connected).text =
-+            "Connected: " + if (eversense.isConnected()) "✅" else "❌"
-+        findViewById<TextView>(R.id.eversense_status_battery).text =
-+            "Battery: " + (state?.let { "${it.batteryPercentage}%" } ?: notConnected)
-+        findViewById<TextView>(R.id.eversense_status_insertion).text =
-+            "Insertion date: " + (state?.let { dateFormatter.format(Date(it.insertionDate)) } ?: notConnected)
-+        findViewById<TextView>(R.id.eversense_status_last_sync).text =
-+            "Last sync: " + (state?.let { dateFormatter.format(Date(it.lastSync)) } ?: notConnected)
-+        findViewById<TextView>(R.id.eversense_status_signal).text =
-+            "Signal: " + (state?.let { signalToLabel(it.sensorSignalStrength) } ?: notConnected)
-+
-+        findViewById<Button>(R.id.eversense_btn_connect).text =
-+            if (eversense.isConnected()) "Disconnect" else "Connect"
-+        findViewById<Button>(R.id.eversense_btn_sync).isEnabled = eversense.isConnected()
-+    }
-+
-+    private fun handleConnectTap() {
-+        if (eversense.isConnected()) {
-+            AlertDialog.Builder(this)
-+                .setTitle(getString(R.string.eversense_scan_title))
-+                .setMessage("Disconnect from transmitter?")
-+                .setPositiveButton("Disconnect") { _, _ ->
-+                    eversense.clearStoredDevice()
-+                    eversense.disconnect()
-+                    mainHandler.postDelayed({ updateStatus() }, 500)
-+                }
-+                .setNegativeButton("Cancel", null)
-+                .show()
-+        } else {
-+            val prefs = getSharedPreferences("EversenseCGMManager", Context.MODE_PRIVATE)
-+            val hasStoredDevice = prefs.getString("eversense_remote_device", null) != null
-+            if (hasStoredDevice) {
-+                ioScope.launch { eversense.connect(null) }
-+                mainHandler.postDelayed({ updateStatus() }, 3000)
-+            } else {
-+                showDeviceSelectionDialog()
-+            }
-+        }
-+    }
-+
-+    private fun showDeviceSelectionDialog() {
-+        val foundDevices = mutableListOf<EversenseScanResult>()
-+        var isCancelled = false
-+        var dialog: AlertDialog? = null
-+
-+        val scanCallback = object : EversenseScanCallback {
-+            override fun onResult(item: EversenseScanResult) {
-+                if (!isCancelled && item.name.matches(Regex("T\\d+.*")) && foundDevices.none { it.name == item.name })
-+                    foundDevices.add(item)
-+            }
-+        }
-+
-+        eversense.startScan(scanCallback)
-+
-+        mainHandler.postDelayed({
-+            if (isCancelled) return@postDelayed
-+            eversense.stopScan()
-+            dialog?.dismiss()
-+            if (foundDevices.isEmpty()) {
-+                AlertDialog.Builder(this)
-+                    .setTitle(getString(R.string.eversense_scan_title))
-+                    .setMessage("No Eversense transmitters found. Make sure the transmitter is nearby and try again.")
-+                    .setPositiveButton("OK", null)
-+                    .show()
-+            } else {
-+                AlertDialog.Builder(this)
-+                    .setTitle(getString(R.string.eversense_scan_title))
-+                    .setItems(foundDevices.map { it.name }.toTypedArray()) { _, position ->
-+                        ioScope.launch { eversense.connect(foundDevices[position].device) }
-+                        mainHandler.postDelayed({ updateStatus() }, 3000)
-+                    }
-+                    .setNegativeButton(getString(R.string.eversense_scan_cancel), null)
-+                    .show()
-+            }
-+        }, 10000)
-+
-+        dialog = AlertDialog.Builder(this)
-+            .setTitle(getString(R.string.eversense_scan_title))
-+            .setMessage("Scanning for Eversense devices (10 seconds)...")
-+            .setNegativeButton(getString(R.string.eversense_scan_cancel)) { _, _ ->
-+                isCancelled = true
-+                eversense.stopScan()
-+            }
-+            .setCancelable(false)
-+            .show()
-+    }
-+
-+    private fun signalToLabel(strength: Int): String = when {
-+        strength >= 75 -> "Excellent"
-+        strength >= 48 -> "Good"
-+        strength >= 30 -> "Low"
-+        strength >= 25 -> "Poor"
-+        strength > 0   -> "Very Poor"
-+        else           -> getString(R.string.eversense_not_connected)
-+    }
-+
-+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-+        if (item.itemId == android.R.id.home) { finish(); return true }
-+        return super.onOptionsItemSelected(item)
-+    }
-+}
+ 
+     private val mainHandler = Handler(Looper.getMainLooper())
+     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+@@ -157,5 +157,3 @@ class EversenseStatusActivity : AppCompatActivity() {
+         return super.onOptionsItemSelected(item)
+     }
+ }
+-
+-
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt
 index 81438ad739..64f9ef9668 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt
@@ -300,10 +172,10 @@ index 81438ad739..64f9ef9668 100644
 +}
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseIntentKey.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseIntentKey.kt
 new file mode 100644
-index 0000000000..ded5d8dff7
+index 0000000000..cebc77b933
 --- /dev/null
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseIntentKey.kt
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,43 @@
 +package app.aaps.plugins.source.keys
 +
 +import app.aaps.core.keys.PreferenceType
@@ -336,8 +208,15 @@ index 0000000000..ded5d8dff7
 +    EversensePlacement(
 +        key = "eversense_placement_launch",
 +        titleResId = R.string.eversense_placement_title
++    ),
++    EversenseSignOut(
++        key = "eversense_sign_out",
++        titleResId = R.string.eversense_sign_out,
++        preferenceType = PreferenceType.CLICK
 +    )
 +}
++
++
 +
 +
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseStringKey.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseStringKey.kt
@@ -450,7 +329,7 @@ index 0000000000..c6166585ff
 +    </LinearLayout>
 +</ScrollView>
 diff --git a/plugins/source/src/main/res/values/strings.xml b/plugins/source/src/main/res/values/strings.xml
-index 7c07b394b7..d3adf71642 100644
+index 760da2fc26..3155f5e86b 100644
 --- a/plugins/source/src/main/res/values/strings.xml
 +++ b/plugins/source/src/main/res/values/strings.xml
 @@ -64,6 +64,8 @@
@@ -462,6 +341,15 @@ index 7c07b394b7..d3adf71642 100644
      <string name="eversense_use_smoothing">Use ESEL Smoothing</string>
      <string name="eversense_cloud_upload_enabled">Enable Eversense cloud upload</string>
      <string name="eversense_cloud_upload_toast">Show cloud upload result</string>
+@@ -115,5 +117,6 @@
+     <string name="eversense_coexistence_summary">Automatically disconnect after each sync to give the official Eversense app time to connect and upload data</string>
+     <string name="eversense_transmitter_not_placed">Eversense transmitter not detecting — check placement</string>
+     <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
++    <string name="eversense_sign_out">Sign out of Eversense 365</string>
+     <string name="eversense_reconnecting">Reconnecting&#x2026;</string>
+-</resources>
+\ No newline at end of file
++</resources>
 -- 
 2.45.1.windows.1
 

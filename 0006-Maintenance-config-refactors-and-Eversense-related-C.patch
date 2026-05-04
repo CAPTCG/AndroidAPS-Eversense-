@@ -1,7 +1,7 @@
-From 746d212f74684e377e956451e493361ba21e3794 Mon Sep 17 00:00:00 2001
+From 8d439262c9ec0becfb5b02a550543a5a72c6b2c6 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:11 -0400
-Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
+Subject: [PATCH 6/6] Maintenance config refactors and Eversense-related Config
  cleanup
 
 - Fix Export Settings local: remove instance-state pendingExportFile
@@ -11,11 +11,10 @@ Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
 ---
  .../app/aaps/implementations/ConfigImpl.kt     |  3 ++-
  .../maintenance/ImportExportPrefs.kt           |  6 ++++--
- core/keys/src/main/res/values/strings.xml      |  4 ++++
  .../core/ui/compose/preference/PreviewUtils.kt |  2 ++
  .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
  .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
- 6 files changed, 29 insertions(+), 14 deletions(-)
+ 5 files changed, 25 insertions(+), 14 deletions(-)
 
 diff --git a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
 index 06cdc76dc3..357bf1c043 100644
@@ -60,19 +59,6 @@ index 9341b25797..19152f8214 100644
  
      /** Cache the password for future exports. Returns the (possibly transformed) password to use. */
      fun cacheExportPassword(password: String): String
-diff --git a/core/keys/src/main/res/values/strings.xml b/core/keys/src/main/res/values/strings.xml
-index 3ace3e48d7..c6d77a1cef 100644
---- a/core/keys/src/main/res/values/strings.xml
-+++ b/core/keys/src/main/res/values/strings.xml
-@@ -458,4 +458,8 @@
-     <!--    Appearance preferences-->
-     <string name="prefs_range_title">Range for visualization</string>
- 
-+    <string name="eversense_use_smoothing">Use ESEL smoothing</string>
-+    <string name="eversense_cloud_upload_enabled">Enable Eversense cloud upload</string>
-+    <string name="eversense_cloud_upload_toast">Show cloud upload result</string>
- </resources>
-+
 diff --git a/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt b/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt
 index 75180d6357..fac9606511 100644
 --- a/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt
