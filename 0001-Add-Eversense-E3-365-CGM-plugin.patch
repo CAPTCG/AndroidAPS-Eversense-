@@ -1,4 +1,4 @@
-From e10de5208f873306d3aa9269a5b8eb8f64e9e59b Mon Sep 17 00:00:00 2001
+From 93cb3a4de70f1139810db213d337783234d373b7 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Wed, 1 Apr 2026 19:13:27 -0400
 Subject: [PATCH 1/5] Add Eversense E3/365 CGM plugin
@@ -48,23 +48,23 @@ Fix EversensePlugin: remove duplicate imports
  plugins/eversense/consumer-rules.pro          |   0
  plugins/eversense/proguard-rules.pro          |  21 +
  .../eversense/src/main/AndroidManifest.xml    |  12 +
- .../eversense/EversenseCGMPlugin.kt           | 364 +++++++++
- .../eversense/EversenseGattCallback.kt        | 583 +++++++++++++++
+ .../eversense/EversenseCGMPlugin.kt           | 364 +++++++++++
+ .../eversense/EversenseGattCallback.kt        | 583 ++++++++++++++++++
  .../callbacks/EversenseScanCallback.kt        |   7 +
  .../eversense/callbacks/EversenseWatcher.kt   |  15 +
- .../eversense/enums/BatteryLevel.kt           |  38 +
+ .../eversense/enums/BatteryLevel.kt           |  38 ++
  .../eversense/enums/CalibrationFlag.kt        |  46 ++
  .../eversense/enums/CalibrationMode.kt        |  29 +
  .../eversense/enums/CalibrationPhase.kt       |  62 ++
- .../eversense/enums/CalibrationReadiness.kt   |  73 ++
+ .../eversense/enums/CalibrationReadiness.kt   |  73 +++
  .../eversense/enums/CommandError.kt           |  30 +
- .../eversense/enums/EversenseAlarm.kt         |  82 ++
+ .../eversense/enums/EversenseAlarm.kt         |  82 +++
  .../eversense/enums/EversenseE3Memory.kt      |  49 ++
  .../eversense/enums/EversenseSecurityType.kt  |  10 +
  .../eversense/enums/EversenseTrendArrow.kt    |  10 +
  .../eversense/enums/EversenseType.kt          |   6 +
- .../eversense/enums/SignalStrength.kt         |  39 +
- .../eversense/enums/TransmitterAlert.kt       | 150 ++++
+ .../eversense/enums/SignalStrength.kt         |  39 ++
+ .../eversense/enums/TransmitterAlert.kt       | 150 +++++
  .../exceptions/EversenseWriteException.kt     |   4 +
  .../eversense/models/ActiveAlarm.kt           |  12 +
  .../eversense/models/EversenseCGMResult.kt    |  11 +
@@ -72,12 +72,12 @@ Fix EversensePlugin: remove duplicate imports
  .../eversense/models/EversenseSecureState.kt  |  13 +
  .../eversense/models/EversenseState.kt        |  50 ++
  .../eversense/models/GlucoseHistoryItem.kt    |  10 +
- .../packets/Eversense365Communicator.kt       | 229 ++++++
- .../eversense/packets/EversenseBasePacket.kt  | 106 +++
- .../packets/EversenseE3Communicator.kt        | 300 ++++++++
+ .../packets/Eversense365Communicator.kt       | 229 +++++++
+ .../eversense/packets/EversenseBasePacket.kt  | 106 ++++
+ .../packets/EversenseE3Communicator.kt        | 300 +++++++++
  .../eversense/packets/EversensePacket.kt      |  17 +
  .../packets/e3/EnterDiagnosticModePacket.kt   |  20 +
- .../packets/e3/EversenseE3Packets.kt          | 117 +++
+ .../packets/e3/EversenseE3Packets.kt          | 117 ++++
  .../packets/e3/ExitDiagnosticModePacket.kt    |  20 +
  .../eversense/packets/e3/GetAlertLogPacket.kt |  42 ++
  .../packets/e3/GetBatteryPercentagePacket.kt  |  47 ++
@@ -92,7 +92,7 @@ Fix EversensePlugin: remove duplicate imports
  .../packets/e3/GetCurrentGlucosePacket.kt     |  45 ++
  .../e3/GetGlucoseAlertsAndStatusPacket.kt     |  56 ++
  .../packets/e3/GetGlucoseLogPacket.kt         |  50 ++
- .../packets/e3/GetGlucoseLogRangePacket.kt    |  36 +
+ .../packets/e3/GetGlucoseLogRangePacket.kt    |  36 ++
  .../e3/GetHighGlucoseRepeatIntervalPacket.kt  |  21 +
  .../packets/e3/GetInsertionDatePacket.kt      |  30 +
  .../packets/e3/GetInsertionTimePacket.kt      |  30 +
@@ -124,7 +124,7 @@ Fix EversensePlugin: remove duplicate imports
  .../eversense/packets/e3/GetVersionPacket.kt  |  23 +
  .../eversense/packets/e3/PingPacket.kt        |  23 +
  .../e3/SaveBondingInformationPacket.kt        |  28 +
- .../packets/e3/SendCalibrationPacket.kt       |  40 +
+ .../packets/e3/SendCalibrationPacket.kt       |  40 ++
  .../packets/e3/SetAppVersionE3Packet.kt       |  30 +
  .../packets/e3/SetBleDisconnectPacket.kt      |  24 +
  .../packets/e3/SetBloodGlucosePointPacket.kt  |  43 ++
@@ -149,18 +149,18 @@ Fix EversensePlugin: remove duplicate imports
  .../e3/SetSettingRateRisingEnabledPacket.kt   |  30 +
  .../e3/SetSettingRateRisingThresholdPacket.kt |  30 +
  .../packets/e3/SetSettingVibratePacket.kt     |  30 +
- .../packets/e3/util/EversenseE3Parser.kt      |  77 ++
+ .../packets/e3/util/EversenseE3Parser.kt      |  77 +++
  .../packets/e3/util/EversenseE3Writer.kt      |  60 ++
  .../packets/e365/AuthIdentityPacket.kt        |  28 +
  .../eversense/packets/e365/AuthStartPacket.kt |  32 +
- .../packets/e365/AuthWhoAmIPacket.kt          |  36 +
+ .../packets/e365/AuthWhoAmIPacket.kt          |  36 ++
  .../e365/EnterDiagnosticMode365Packet.kt      |  17 +
- .../packets/e365/Eversense365Packets.kt       |  75 ++
+ .../packets/e365/Eversense365Packets.kt       |  75 +++
  .../e365/ExitDiagnosticMode365Packet.kt       |  17 +
  .../packets/e365/GetActiveAlarmsPacket.kt     |  52 ++
  .../packets/e365/GetAlertsLogValuesPacket.kt  |  64 ++
  .../packets/e365/GetCalibrationInfoPacket.kt  |  60 ++
- .../e365/GetCalibrationLogValuesPacket.kt     |  72 ++
+ .../e365/GetCalibrationLogValuesPacket.kt     |  72 +++
  .../packets/e365/GetGlucoseDataPacket.kt      |  84 +++
  .../packets/e365/GetGlucoseLogValuesPacket.kt |  84 +++
  .../packets/e365/GetLogRangePacket365.kt      |  47 ++
@@ -174,7 +174,7 @@ Fix EversensePlugin: remove duplicate imports
  .../packets/e365/SetAppVersion365Packet.kt    |  24 +
  .../packets/e365/SetBleDisconnect365Packet.kt |  25 +
  .../e365/SetBloodGlucosePointPacket365.kt     |  32 +
- .../packets/e365/SetCurrentDateTimePacket.kt  |  38 +
+ .../packets/e365/SetCurrentDateTimePacket.kt  |  38 ++
  .../e365/SetHighGlucoseAlarm365Packet.kt      |  20 +
  .../SetHighGlucoseAlarmEnabled365Packet.kt    |  17 +
  .../e365/SetLowGlucoseAlarm365Packet.kt       |  20 +
@@ -191,33 +191,33 @@ Fix EversensePlugin: remove duplicate imports
  .../e365/SetRepeatHighGlucose365Packet.kt     |  20 +
  .../e365/SetRepeatLowGlucose365Packet.kt      |  20 +
  .../packets/e365/SetVibrateMode365Packet.kt   |  17 +
- .../packets/e365/utils/ByteArrayUtil.kt       |  70 ++
+ .../packets/e365/utils/ByteArrayUtil.kt       |  70 +++
  .../eversense/util/EselSmoothing.kt           |  33 +
- .../eversense/util/EversenseCrypto365Util.kt  | 303 ++++++++
- .../eversense/util/EversenseHttp365Util.kt    | 498 +++++++++++++
- .../eversense/util/EversenseLogger.kt         | 118 +++
- .../eversense/util/EversenseScanner.kt        |  35 +
- .../nightscout/eversense/util/MessageCoder.kt | 114 +++
+ .../eversense/util/EversenseCrypto365Util.kt  | 303 +++++++++
+ .../eversense/util/EversenseHttp365Util.kt    | 498 +++++++++++++++
+ .../eversense/util/EversenseLogger.kt         | 118 ++++
+ .../eversense/util/EversenseScanner.kt        |  35 ++
+ .../nightscout/eversense/util/MessageCoder.kt | 114 ++++
  .../eversense/util/RangeCalculator.kt         |  21 +
  .../nightscout/eversense/util/StorageKeys.kt  |  11 +
- .../packets/e3/CalibrationPacketTest.kt       | 181 +++++
- .../util/EversenseHttp365UtilTest.kt          | 315 ++++++++
+ .../packets/e3/CalibrationPacketTest.kt       | 181 ++++++
+ .../util/EversenseHttp365UtilTest.kt          | 315 ++++++++++
  plugins/source/build.gradle.kts               |   4 +-
  plugins/source/src/main/AndroidManifest.xml   |   8 +
- .../aaps/plugins/source/EversensePlugin.kt    | 700 ++++++++++++++++++
+ .../aaps/plugins/source/EversensePlugin.kt    | 532 ++++++++++++++++
  .../EversenseCalibrationActivity.kt           |  86 +++
- .../activities/EversensePlacementActivity.kt  | 148 ++++
- .../activities/EversenseStatusActivity.kt     | 161 ++++
- .../RequestEversensePermissionActivity.kt     |  41 +
+ .../activities/EversensePlacementActivity.kt  | 148 +++++
+ .../activities/EversenseStatusActivity.kt     | 161 +++++
+ .../RequestEversensePermissionActivity.kt     |  41 ++
  .../aaps/plugins/source/di/SourceModule.kt    |   8 +
  .../res/drawable/eversense_signal_bar.xml     |   6 +
- .../layout/activity_eversense_calibration.xml |  81 ++
- .../layout/activity_eversense_placement.xml   | 117 +++
+ .../layout/activity_eversense_calibration.xml |  81 +++
+ .../layout/activity_eversense_placement.xml   | 117 ++++
  .../src/main/res/layout/source_fragment.xml   |  16 +
  plugins/source/src/main/res/values/colors.xml |   8 +
  .../source/src/main/res/values/strings.xml    |  65 ++
  settings.gradle                               |   1 +
- 181 files changed, 9544 insertions(+), 1 deletion(-)
+ 181 files changed, 9376 insertions(+), 1 deletion(-)
  create mode 100644 plugins/eversense/.gitignore
  create mode 100644 plugins/eversense/build.gradle.kts
  create mode 100644 plugins/eversense/consumer-rules.pro
@@ -9656,11 +9656,11 @@ index 607a2dbf65..17aa22eaea 100644
 \ No newline at end of file
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
 new file mode 100644
-index 0000000000..e2a8c3915d
+index 0000000000..d5e9ebc686
 --- /dev/null
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-@@ -0,0 +1,700 @@
-+package app.aaps.plugins.source
+@@ -0,0 +1,532 @@
++﻿package app.aaps.plugins.source
 +
 +import android.Manifest
 +import android.content.Intent
@@ -9671,12 +9671,11 @@ index 0000000000..e2a8c3915d
 +import androidx.appcompat.app.AlertDialog
 +import androidx.core.content.ContextCompat
 +import androidx.core.content.edit
-+import androidx.preference.EditTextPreference
-+import androidx.preference.Preference
-+import androidx.preference.PreferenceCategory
-+import androidx.preference.PreferenceManager
-+import androidx.preference.PreferenceScreen
-+import androidx.preference.SwitchPreference
++import app.aaps.core.interfaces.configuration.Config
++import app.aaps.core.interfaces.notifications.NotificationId
++import app.aaps.core.interfaces.notifications.NotificationLevel
++import app.aaps.core.interfaces.notifications.NotificationManager
++import com.nightscout.eversense.models.ActiveAlarm
 +import app.aaps.core.data.model.GV
 +import app.aaps.core.data.model.SourceSensor
 +import app.aaps.core.data.model.TrendArrow
@@ -9688,11 +9687,14 @@ index 0000000000..e2a8c3915d
 +import app.aaps.core.interfaces.plugin.PluginDescription
 +import app.aaps.core.interfaces.resources.ResourceHelper
 +import app.aaps.core.interfaces.source.BgSource
++import app.aaps.core.keys.IntKey
 +import app.aaps.core.keys.interfaces.Preferences
 +import com.nightscout.eversense.EversenseCGMPlugin
 +import com.nightscout.eversense.callbacks.EversenseScanCallback
 +import com.nightscout.eversense.callbacks.EversenseWatcher
++import app.aaps.plugins.source.compose.BgSourceComposeContent
 +import com.nightscout.eversense.enums.CalibrationReadiness
++import com.nightscout.eversense.enums.EversenseAlarm
 +import com.nightscout.eversense.enums.EversenseType
 +import com.nightscout.eversense.models.EversenseCGMResult
 +import com.nightscout.eversense.models.EversenseScanResult
@@ -9708,17 +9710,17 @@ index 0000000000..e2a8c3915d
 +import java.util.Date
 +import java.util.Locale
 +import app.aaps.core.keys.interfaces.withActivity
++import app.aaps.core.keys.interfaces.withClick
 +import app.aaps.plugins.source.activities.EversenseStatusActivity
 +import app.aaps.plugins.source.activities.EversenseCalibrationActivity
 +import app.aaps.plugins.source.activities.EversensePlacementActivity
 +import app.aaps.plugins.source.keys.EversenseIntentKey
 +import app.aaps.plugins.source.keys.EversenseStringKey
++import app.aaps.core.ui.compose.icons.IcPluginEversense
 +import app.aaps.core.keys.BooleanKey
 +import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 +import javax.inject.Inject
-+import javax.inject.Singleton
 +
-+@Singleton
 +class EversensePlugin @Inject constructor(
 +    rh: ResourceHelper,
 +    private val context: Context,
@@ -9729,7 +9731,12 @@ index 0000000000..e2a8c3915d
 +) : AbstractBgSourcePlugin(
 +    PluginDescription()
 +        .mainType(PluginType.BGSOURCE)
-+        .pluginIcon(app.aaps.core.objects.R.drawable.ic_blooddrop_48)
++        .composeContent { _ ->
++            BgSourceComposeContent(
++                title = rh.gs(R.string.source_eversense)
++            )
++        }
++        .icon(IcPluginEversense)
 +        .pluginName(R.string.source_eversense)
 +        .preferencesVisibleInSimpleMode(false)
 +        .description(R.string.description_source_eversense),
@@ -9738,18 +9745,17 @@ index 0000000000..e2a8c3915d
 +), BgSource, EversenseWatcher {
 +
 +    @Inject lateinit var persistenceLayer: PersistenceLayer
++
++    override var sensorBatteryLevel = -1
++
 +    private val mainHandler = Handler(Looper.getMainLooper())
 +    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 +    private val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 +    private val json = Json { ignoreUnknownKeys = true }
++
 +    private val securePrefs by lazy {
 +        context.getSharedPreferences("EversenseCGMManager", Context.MODE_PRIVATE)
 +    }
-+    private var connectedPreference: Preference? = null
-+    private var releasePreference: Preference? = null
-+    private var lastNotifiedFirmwareVersion: String = ""
-+    private var consecutiveNoSignalReadings: Int = 0
-+    private val NO_SIGNAL_WARNING_THRESHOLD = 3
 +
 +    private fun cloudUploadEnabled() = preferences.get(BooleanKey.EversenseCloudUploadEnabled)
 +    private fun cloudUploadToastEnabled() = preferences.get(BooleanKey.EversenseCloudUploadToast)
@@ -9773,14 +9779,13 @@ index 0000000000..e2a8c3915d
 +    private var releaseForOfficialApp: Boolean = false
 +    @Volatile private var placementNotificationSnoozed: Boolean = false
 +
-+    private val eversense get() = EversenseCGMPlugin.instance
++    init {
++        eversense.setContext(context, true)
++    }
 +
 +    override fun onStart() {
 +        super.onStart()
-+        eversense.setContext(context, true)
 +        eversense.addWatcher(this)
-+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-+            eversense.connect(null)
 +        if (hasBluetoothPermissions()) {
 +            aapsLogger.debug(LTag.BGSOURCE, "onStart — permissions granted, attempting auto-reconnect")
 +            ioScope.launch {
@@ -9797,270 +9802,32 @@ index 0000000000..e2a8c3915d
 +        eversense.removeWatcher(this)
 +    }
 +
-+    override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
-+        if (requiredKey != null) return
++    private fun requestBluetoothPermissions() {
++        val intent = Intent(context, app.aaps.plugins.source.activities.RequestEversensePermissionActivity::class.java)
++        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++        context.startActivity(intent)
++    }
 +
-+        val eselSmoothing = SwitchPreference(context)
-+        eselSmoothing.key = "eversense_use_smoothing"
-+        eselSmoothing.title = rh.gs(R.string.eversense_use_smoothing)
-+        eselSmoothing.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
-+            eversense.setSmoothing(newValue as Boolean)
-+            true
++    private fun hasBluetoothPermissions(): Boolean {
++        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
++            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
++                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
++        } else {
++            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED
 +        }
-+
-+        val credentialsCategory = PreferenceCategory(context)
-+        credentialsCategory.title = rh.gs(R.string.eversense_credentials_title)
-+
-+        val username = EditTextPreference(context)
-+        username.key = "eversense_credentials_username"
-+        username.title = rh.gs(R.string.eversense_credentials_username)
-+        val secureState = getSecureState()
-+        username.summary = if (secureState.username.isNotEmpty()) secureState.username
-+        else rh.gs(R.string.eversense_credentials_not_set)
-+        username.dialogTitle = rh.gs(R.string.eversense_credentials_username)
-+        username.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, newValue ->
-+            val state = getSecureState()
-+            val updated = EversenseSecureState().also { it.canUseShortcut = state.canUseShortcut; it.username = newValue as String; it.password = state.password; it.clientId = state.clientId; it.privateKey = state.privateKey; it.publicKey = state.publicKey }
-+            saveSecureState(updated)
-+            val newStr = newValue as String
-+            pref.summary = if (newStr.isNotEmpty()) newStr else rh.gs(R.string.eversense_credentials_not_set)
-+            aapsLogger.info(LTag.BGSOURCE, "Eversense username updated")
-+            true
-+        }
-+
-+        val password = EditTextPreference(context)
-+        password.key = "eversense_credentials_password"
-+        password.title = rh.gs(R.string.eversense_credentials_password)
-+        password.summary = if (secureState.password.isNotEmpty()) rh.gs(R.string.eversense_credentials_password_set)
-+        else rh.gs(R.string.eversense_credentials_not_set)
-+        password.dialogTitle = rh.gs(R.string.eversense_credentials_password)
-+        password.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, newValue ->
-+            val state = getSecureState()
-+            val updated = EversenseSecureState().also { it.canUseShortcut = state.canUseShortcut; it.username = state.username; it.password = newValue as String; it.clientId = state.clientId; it.privateKey = state.privateKey; it.publicKey = state.publicKey }
-+            saveSecureState(updated)
-+            pref.summary = if ((newValue as String).isNotEmpty()) rh.gs(R.string.eversense_credentials_password_set)
-+            else rh.gs(R.string.eversense_credentials_not_set)
-+            aapsLogger.info(LTag.BGSOURCE, "Eversense password updated")
-+            true
-+        }
-+
-+        val signOut = Preference(context)
-+        signOut.key = "eversense_credentials_sign_out"
-+        signOut.title = "Sign out"
-+        signOut.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            AlertDialog.Builder(context)
-+                .setTitle("Sign out")
-+                .setMessage("Are you sure you want to clear your Eversense credentials?")
-+                .setPositiveButton("Yes") { _, _ ->
-+                    saveSecureState(EversenseSecureState())
-+                    username.summary = rh.gs(R.string.eversense_credentials_not_set)
-+                    password.summary = rh.gs(R.string.eversense_credentials_not_set)
-+                    aapsLogger.info(LTag.BGSOURCE, "Eversense credentials cleared by user")
-+                }
-+                .setNegativeButton("No", null)
-+                .show()
-+            true
-+        }
-+
-+        val calibrationCategory = PreferenceCategory(context)
-+        calibrationCategory.title = rh.gs(R.string.eversense_calibration_title)
-+
-+        val currentPhase = Preference(context)
-+        currentPhase.key = "eversense_calibration_phase"
-+        currentPhase.title = rh.gs(R.string.eversense_calibration_phase)
-+        val state = eversense.getCurrentState()
-+        currentPhase.summary = state?.calibrationPhase?.name ?: rh.gs(R.string.eversense_not_connected)
-+
-+        val lastCalibration = Preference(context)
-+        lastCalibration.key = "eversense_calibration_last"
-+        lastCalibration.title = rh.gs(R.string.eversense_calibration_last)
-+        lastCalibration.summary = if (state != null && state.lastCalibrationDate > 0)
-+            dateFormatter.format(Date(state.lastCalibrationDate))
-+        else rh.gs(R.string.eversense_not_connected)
-+
-+        val nextCalibration = Preference(context)
-+        nextCalibration.key = "eversense_calibration_next"
-+        nextCalibration.title = rh.gs(R.string.eversense_calibration_next)
-+        nextCalibration.summary = if (state != null && state.nextCalibrationDate > 0)
-+            dateFormatter.format(Date(state.nextCalibrationDate))
-+        else rh.gs(R.string.eversense_not_connected)
-+
-+        val calibrationAction = Preference(context)
-+        calibrationAction.key = "eversense_calibration_action"
-+        calibrationAction.title = rh.gs(R.string.eversense_calibration_action)
-+        calibrationAction.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            val latestState = eversense.getCurrentState()
-+            if (latestState?.calibrationReadiness == CalibrationReadiness.READY) {
-+                val intent = Intent(context, app.aaps.plugins.source.activities.EversenseCalibrationActivity::class.java)
-+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-+                context.startActivity(intent)
-+            } else {
-+                AlertDialog.Builder(context)
-+                    .setTitle(rh.gs(R.string.eversense_calibration_title))
-+                    .setMessage(rh.gs(R.string.eversense_calibration_not_supported))
-+                    .setPositiveButton("OK", null)
-+                    .show()
-+            }
-+            true
-+        }
-+
-+        val informationCategory = PreferenceCategory(context)
-+        informationCategory.title = rh.gs(R.string.eversense_information_title)
-+
-+        val connected = Preference(context)
-+        connected.key = "eversense_information_connected"
-+        connected.title = rh.gs(R.string.eversense_information_connected)
-+        connected.summary = if (eversense.isConnected()) "\u2705" else "\u274C"
-+        connected.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            if (eversense.isConnected()) {
-+                showDeviceScanDialog(context)
-+            } else {
-+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-+                    val intent = Intent(context, app.aaps.plugins.source.activities.RequestEversensePermissionActivity::class.java)
-+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-+                    context.startActivity(intent)
-+                } else {
-+                    showDeviceScanDialog(context)
-+                }
-+            }
-+            true
-+        }
-+        connectedPreference = connected
-+
-+        val battery = Preference(context)
-+        battery.key = "eversense_information_battery"
-+        battery.title = rh.gs(R.string.eversense_information_battery)
-+        battery.summary = if (state != null && state.batteryPercentage >= 0) "${state.batteryPercentage}%" else rh.gs(R.string.eversense_not_connected)
-+
-+        val placementSignal = Preference(context)
-+        placementSignal.key = "eversense_information_placement_signal"
-+        placementSignal.title = rh.gs(R.string.eversense_placement_signal)
-+        placementSignal.summary = if (state != null && state.sensorSignalStrength > 0) "${state.sensorSignalStrength}%" else rh.gs(R.string.eversense_not_connected)
-+        placementSignal.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            val intent = Intent(context, app.aaps.plugins.source.activities.EversensePlacementActivity::class.java)
-+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-+            context.startActivity(intent)
-+            true
-+        }
-+
-+        val insertion = Preference(context)
-+        insertion.key = "eversense_information_insertion_date"
-+        insertion.title = rh.gs(R.string.eversense_information_insertion_date)
-+        insertion.summary = if (state != null && state.insertionDate > 0) dateFormatter.format(Date(state.insertionDate)) else rh.gs(R.string.eversense_not_connected)
-+
-+        val lastSync = Preference(context)
-+        lastSync.key = "eversense_information_last_sync"
-+        lastSync.title = rh.gs(R.string.eversense_information_last_sync)
-+        lastSync.summary = if (state != null && state.lastSync > 0) dateFormatter.format(Date(state.lastSync)) else rh.gs(R.string.eversense_not_connected)
-+        lastSync.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            if (!eversense.isConnected()) {
-+                aapsLogger.warn(LTag.BGSOURCE, "Cannot trigger sync — not connected")
-+            } else {
-+                eversense.triggerFullSync()
-+            }
-+            true
-+        }
-+
-+        val releaseForApp = Preference(context)
-+        releaseForApp.key = "eversense_release_for_official_app"
-+        releaseForApp.title = rh.gs(R.string.eversense_release_for_official_app)
-+        releaseForApp.summary = rh.gs(R.string.eversense_release_summary)
-+        releaseForApp.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-+            eversense.disconnect()
-+            releaseForApp.summary = rh.gs(R.string.eversense_release_active)
-+            notificationManager.post(NotificationId.EVERSENSE_RELEASE, "Eversense transmitter released — open the official Eversense app to connect", NotificationLevel.INFO)
-+            val handler = Handler(Looper.getMainLooper())
-+            val reconnectRunnable = object : Runnable {
-+                override fun run() {
-+                    if (!eversense.isConnected()) {
-+                        eversense.connect(null)
-+                        if (!eversense.isConnected()) {
-+                            handler.postDelayed(this, 300000L)
-+                        } else {
-+                            releasePreference?.summary = rh.gs(R.string.eversense_release_summary)
-+                        }
-+                    } else {
-+                        releasePreference?.summary = rh.gs(R.string.eversense_release_summary)
-+                    }
-+                }
-+            }
-+            handler.postDelayed(reconnectRunnable, 300000L)
-+            true
-+        }
-+        releasePreference = releaseForApp
-+
-+        parent.addPreference(eselSmoothing)
-+        parent.addPreference(credentialsCategory)
-+        credentialsCategory.addPreference(username)
-+        credentialsCategory.addPreference(password)
-+        credentialsCategory.addPreference(signOut)
-+        parent.addPreference(calibrationCategory)
-+        calibrationCategory.addPreference(currentPhase)
-+        calibrationCategory.addPreference(lastCalibration)
-+        calibrationCategory.addPreference(nextCalibration)
-+        calibrationCategory.addPreference(calibrationAction)
-+        parent.addPreference(informationCategory)
-+        informationCategory.addPreference(connected)
-+        informationCategory.addPreference(battery)
-+        informationCategory.addPreference(placementSignal)
-+        informationCategory.addPreference(insertion)
-+        informationCategory.addPreference(lastSync)
-+        informationCategory.addPreference(releaseForApp)
 +    }
 +
 +    private fun getSecureState(): EversenseSecureState {
-+        val json = Json { ignoreUnknownKeys = true }
-+        val stored = securePrefs.getString(StorageKeys.SECURE_STATE, null)
-+        return if (stored != null) {
-+            try { json.decodeFromString(EversenseSecureState.serializer(), stored) }
-+            catch (e: Exception) { EversenseSecureState() }
-+        } else EversenseSecureState()
++        val stateJson = securePrefs.getString(StorageKeys.SECURE_STATE, null) ?: "{}"
++        return json.decodeFromString(stateJson)
 +    }
 +
 +    private fun saveSecureState(state: EversenseSecureState) {
-+        val json = Json { ignoreUnknownKeys = true }
-+        securePrefs.edit {
++        securePrefs.edit(commit = true) {
 +            putString(StorageKeys.SECURE_STATE, json.encodeToString(EversenseSecureState.serializer(), state))
 +        }
 +    }
 +
-+    private fun showDeviceScanDialog(context: Context) {
-+        val foundDevices = mutableListOf<EversenseScanResult>()
-+        val scanCallback = object : EversenseScanCallback {
-+            override fun onResult(item: EversenseScanResult) {
-+                if (foundDevices.none { it.device.address == item.device.address }) {
-+                    foundDevices.add(item)
-+                }
-+            }
-+        }
-+        eversense.startScan(scanCallback)
-+        mainHandler.postDelayed({
-+            eversense.stopScan()
-+            mainHandler.post {
-+                if (foundDevices.isEmpty()) {
-+                    AlertDialog.Builder(context)
-+                        .setTitle(rh.gs(R.string.eversense_scan_title))
-+                        .setMessage("No Eversense transmitters found. Make sure the transmitter is nearby and try again.")
-+                        .setPositiveButton("OK", null)
-+                        .show()
-+                } else {
-+                    val names = foundDevices.map { it.name ?: rh.gs(R.string.eversense_scan_unknown_device) }.toTypedArray()
-+                    AlertDialog.Builder(context)
-+                        .setTitle(rh.gs(R.string.eversense_scan_title))
-+                        .setItems(names) { _, which ->
-+                            val selected = foundDevices[which]
-+                            eversense.connect(selected.device)
-+                        }
-+                        .setNegativeButton(rh.gs(R.string.eversense_scan_cancel), null)
-+                        .show()
-+                }
-+            }
-+        }, 5000L)
-+        AlertDialog.Builder(context)
-+            .setTitle(rh.gs(R.string.eversense_scan_title))
-+            .setMessage("Scanning for Eversense devices...")
-+            .setNegativeButton(rh.gs(R.string.eversense_scan_cancel)) { _, _ -> eversense.stopScan() }
-+            .show()
 +    override fun getPreferenceScreenContent() = PreferenceSubScreenDef(
 +        key = "eversense_settings",
 +        titleResId = R.string.source_eversense,
@@ -10068,7 +9835,6 @@ index 0000000000..e2a8c3915d
 +            EversenseIntentKey.EversenseStatus.withActivity(EversenseStatusActivity::class.java),
 +            BooleanKey.EversenseUseSmoothing,
 +            BooleanKey.EversenseCloudUploadEnabled,
-+            BooleanKey.EversenseCloudUploadToast,
 +            PreferenceSubScreenDef(
 +                key = "eversense_credentials_screen",
 +                titleResId = R.string.eversense_credentials_title,
@@ -10077,6 +9843,14 @@ index 0000000000..e2a8c3915d
 +                    EversenseStringKey.EversensePassword
 +                )
 +            ),
++            EversenseIntentKey.EversenseSignOut.withClick {
++                val cleared = getSecureState().also {
++                    it.username = ""
++                    it.password = ""
++                }
++                saveSecureState(cleared)
++                aapsLogger.info(LTag.BGSOURCE, "Eversense credentials cleared by user")
++            },
 +            EversenseIntentKey.EversenseCalibration.withActivity(EversenseCalibrationActivity::class.java as Class<*>),
 +            EversenseIntentKey.EversensePlacement.withActivity(EversensePlacementActivity::class.java as Class<*>)
 +        ),
@@ -10115,6 +9889,9 @@ index 0000000000..e2a8c3915d
 +
 +    override fun onStateChanged(state: EversenseState) {
 +        aapsLogger.info(LTag.BGSOURCE, "New state received: ${Json.encodeToString(state)}")
++
++        // Update sensor battery level for Overview status lights
++        sensorBatteryLevel = if (state.batteryPercentage > 0) state.batteryPercentage else -1
 +
 +        // Sync SAGE color thresholds to match Eversense sensor lifetime and notification days
 +        if (state.insertionDate > 0) {
@@ -10183,9 +9960,8 @@ index 0000000000..e2a8c3915d
 +            )
 +        }
 +
-+        // Calibration due notification — E365 only, fires once at noon per nextCalibrationDate
-+        val isAfterNoonCal = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >= 12
-+        if (eversense.is365() && isAfterNoonCal && state.nextCalibrationDate > 0
++        // Calibration due notification — fires once per nextCalibrationDate
++        if (state.nextCalibrationDate > 0
 +            && System.currentTimeMillis() >= state.nextCalibrationDate
 +            && !isCalibrationDueDismissed(state.nextCalibrationDate)) {
 +            setCalibrationDueDismissed(state.nextCalibrationDate)
@@ -10212,36 +9988,9 @@ index 0000000000..e2a8c3915d
 +        aapsLogger.warn(LTag.BGSOURCE, "Transmitter not placed — firing placement warning notification")
 +        mainHandler.post {
 +            notificationManager.post(
-+                id = NotificationId.EVERSENSE_PLACEMENT,
-+                text = rh.gs(R.string.eversense_transmitter_not_placed),
++                NotificationId.EVERSENSE_PLACEMENT,
++                rh.gs(R.string.eversense_transmitter_not_placed),
 +                level = NotificationLevel.URGENT
-+            )
-+        }
-+    }
-+
-+    override fun onStateChanged(state: EversenseState) {
-+        mainHandler.post {
-+            connectedPreference?.summary = if (eversense.isConnected()) "\u2705" else "\u274C"
-+        }
-+
-+        if (state.sensorSignalStrength == 0) {
-+            consecutiveNoSignalReadings++
-+            aapsLogger.warn(LTag.BGSOURCE, "No signal reading $consecutiveNoSignalReadings of $NO_SIGNAL_WARNING_THRESHOLD")
-+            if (consecutiveNoSignalReadings >= NO_SIGNAL_WARNING_THRESHOLD) {
-+                onTransmitterNotPlaced()
-+                consecutiveNoSignalReadings = 0
-+            }
-+        } else {
-+            consecutiveNoSignalReadings = 0
-+            notificationManager.dismiss(NotificationId.EVERSENSE_PLACEMENT)
-+        }
-+
-+        if (state.firmwareVersion.isNotEmpty() && state.firmwareVersion != lastNotifiedFirmwareVersion) {
-+            lastNotifiedFirmwareVersion = state.firmwareVersion
-+            notificationManager.post(
-+                id = NotificationId.EVERSENSE_FIRMWARE,
-+                text = "Eversense firmware: ${state.firmwareVersion} — open the official Eversense app to check for updates",
-+                level = NotificationLevel.INFO
 +            )
 +        }
 +    }
@@ -10249,12 +9998,24 @@ index 0000000000..e2a8c3915d
 +    override fun onConnectionChanged(connected: Boolean) {
 +        aapsLogger.info(LTag.BGSOURCE, "Connection changed — connected: $connected")
 +        mainHandler.post {
-+            connectedPreference?.summary = if (connected) "\u2705" else "\u274C"
 +        }
 +    }
 +
 +    override fun onAlarmReceived(alarm: ActiveAlarm) {
 +        aapsLogger.info(LTag.BGSOURCE, "Eversense alarm received: ${alarm.code.title}")
++        // CRITICAL_FAULT (code 0) is sent for both hardware faults and calibration-overdue events.
++        // If the stored next calibration date has already passed, treat it as a calibration alarm.
++        val title = if (alarm.code == EversenseAlarm.CRITICAL_FAULT) {
++            val stateJson = securePrefs.getString(StorageKeys.STATE, null)
++            val state = stateJson?.let { json.decodeFromString<EversenseState>(it) }
++            if (state != null && state.nextCalibrationDate > 0 && state.nextCalibrationDate < System.currentTimeMillis()) {
++                "Eversense Calibration Due Now"
++            } else {
++                alarm.code.title
++            }
++        } else {
++            alarm.code.title
++        }
 +        val level = when {
 +            alarm.code.isCritical -> NotificationLevel.URGENT
 +            alarm.code.isWarning  -> NotificationLevel.NORMAL
@@ -10262,8 +10023,8 @@ index 0000000000..e2a8c3915d
 +        }
 +        mainHandler.post {
 +            notificationManager.post(
-+                id = NotificationId.EVERSENSE_ALARM,
-+                text = alarm.code.title,
++                NotificationId.EVERSENSE_ALARM,
++                title,
 +                level = level
 +            )
 +        }
@@ -10283,13 +10044,78 @@ index 0000000000..e2a8c3915d
 +                }
 +            )
 +        }
-+        if (glucoseValues.isNotEmpty()) {
-+            ioScope.launch {
-+                persistenceLayer.insertCgmSourceData(Sources.Eversense, glucoseValues, emptyList(), null)
++
++        ioScope.launch {
++            val state = eversense.getCurrentState()
++            val insertionDate = state?.insertionDate?.takeIf { it > 0 }
++            val result = persistenceLayer.insertCgmSourceData(
++                Sources.Eversense,
++                glucoseValues,
++                listOf(),
++                insertionDate
++            )
++            aapsLogger.info(LTag.BGSOURCE, "CGM insert complete — inserted: ${result.inserted}, updated: ${result.updated}")
++
++            // Upload E365 readings to Eversense cloud so official app sees data without needing BLE
++            if (type == EversenseType.EVERSENSE_365 && state != null && cloudUploadEnabled()) {
++                val prefs = context.getSharedPreferences("EversenseCGMManager", android.content.Context.MODE_PRIVATE)
++                // Sync credentials from AAPS preferences into SECURE_STATE so EversenseHttp365Util can read them
++                val username = preferences.get(EversenseStringKey.EversenseUsername)
++                val password = preferences.get(EversenseStringKey.EversensePassword)
++                if (username.isNotEmpty() && password.isNotEmpty()) {
++                    val secureState = getSecureState().also {
++                        it.username = username
++                        it.password = password
++                    }
++                    saveSecureState(secureState)
++                }
++
++                val uploadOk = com.nightscout.eversense.util.EversenseHttp365Util.uploadGlucoseReadings(
++                    preferences = prefs,
++                    readings = readings,
++                    transmitterSerialNumber = state.transmitterName.ifEmpty { state.transmitterSerialNumber },
++                    firmwareVersion = state.firmwareVersion
++                )
++                val msg = if (uploadOk)
++                    "Eversense cloud upload: ✅ ${readings.size} reading(s) sent"
++                else
++                    "Eversense cloud upload: ❌ failed — check credentials and internet"
++                aapsLogger.info(LTag.BGSOURCE, msg)
++
++                // Post current glucose state to the portal (updates Last Sync Date + feeds AGP)
++                val latest = readings.firstOrNull { it.rawResponseHex.isNotEmpty() } ?: readings.firstOrNull()
++                if (latest != null) {
++                    val portalOk = com.nightscout.eversense.util.EversenseHttp365Util.putCurrentValues(
++                        preferences = prefs,
++                        glucose = latest.glucoseInMgDl,
++                        timestamp = latest.datetime,
++                        trend = latest.trend,
++                        signalStrength = state.sensorSignalStrength,
++                        batteryPercentage = state.batteryPercentage
++                    )
++                    aapsLogger.info(LTag.BGSOURCE, "Eversense portal sync: ${if (portalOk) "✅ ok" else "❌ failed"}")
++                }
++
++                // Post device events — this is the endpoint that populates the portal's
++                // Sensor Glucose history table (PutCurrentValues alone only updates Last Sync Date)
++                val uploadableReadings = readings.filter { it.rawResponseHex.isNotEmpty() }
++                if (uploadableReadings.isNotEmpty()) {
++                    val eventsOk = com.nightscout.eversense.util.EversenseHttp365Util.putDeviceEvents(
++                        preferences = prefs,
++                        readings = uploadableReadings,
++                        transmitterSerialNumber = state.transmitterSerialNumber
++                    )
++                    aapsLogger.info(LTag.BGSOURCE, "Eversense device events: ${if (eventsOk) "✅ ok" else "❌ failed"}")
++                }
++
++                if (cloudUploadToastEnabled()) {
++                    mainHandler.post {
++                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
++                    }
++                }
 +            }
 +        }
 +    }
-+}
 +
 +    private fun showDeviceSelectionDialog(context: Context) {
 +        val foundDevices = mutableListOf<EversenseScanResult>()
@@ -10360,6 +10186,12 @@ index 0000000000..e2a8c3915d
 +
 +
 +
++<<<<<<< Updated upstream
++=======
++
++
++
++>>>>>>> Stashed changes
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseCalibrationActivity.kt
 new file mode 100644
 index 0000000000..876ffd8991
