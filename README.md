@@ -39,7 +39,7 @@ Before applying patches, make sure you are on the `dev` branch. In Android Studi
 Open the **Terminal** in Android Studio (bottom toolbar) and run each line in order:
 
     git am -3 C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
-    git am -3 C:/EversensePatches/0002-Add-BooleanKey-entries-for-Eversense-preferences.patch
+    git am -3 C:/EversensePatches/0002-Add-BooleanKey-and-Eversense-preferences-migration.patch
     git am -3 C:/EversensePatches/0003-Add-EversenseStatusActivity-fix-plugin-registration-.patch
     git am -3 C:/EversensePatches/0004-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
     git am -3 C:/EversensePatches/0005-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
@@ -77,3 +77,4 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
+
