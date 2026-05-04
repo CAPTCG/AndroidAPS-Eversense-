@@ -1,4 +1,4 @@
-From 168b3b2801162ebd56096e7b0aea905b733d735c Mon Sep 17 00:00:00 2001
+From 1252dcf23b7ce9514ce4b44a3fc11d60bcab88ab Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Fri, 17 Apr 2026 09:35:49 -0400
 Subject: [PATCH 2/5] Add EversenseStatusActivity, fix plugin registration, add

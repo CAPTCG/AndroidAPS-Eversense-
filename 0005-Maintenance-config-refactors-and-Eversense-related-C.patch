@@ -1,4 +1,4 @@
-From 5a457b05dbea78aa2f55ca29fbf2aa2fe10d349c Mon Sep 17 00:00:00 2001
+From 61c62ee6aeecec039e83b4017921bd4342cf4716 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:11 -0400
 Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
@@ -13,8 +13,9 @@ Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
  .../maintenance/ImportExportPrefs.kt           |  6 ++++--
  .../core/ui/compose/preference/PreviewUtils.kt |  2 ++
  .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
+ .../app/aaps/plugins/source/EversensePlugin.kt |  8 +-------
  .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
- 5 files changed, 25 insertions(+), 14 deletions(-)
+ 6 files changed, 26 insertions(+), 21 deletions(-)
 
 diff --git a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
 index 06cdc76dc3..357bf1c043 100644
@@ -131,6 +132,26 @@ index 95e21f3197..2e7265c24b 100644
                  localSuccess = savePreferences(file, password)
                  val resultMessage = if (localSuccess) rh.gs(R.string.exported) else rh.gs(R.string.exported_failed)
                  persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+index d5e9ebc686..7c454732cb 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+@@ -1,4 +1,4 @@
+-﻿package app.aaps.plugins.source
++package app.aaps.plugins.source
+ 
+ import android.Manifest
+ import android.content.Intent
+@@ -524,9 +524,3 @@ class EversensePlugin @Inject constructor(
+ 
+ 
+ 
+-<<<<<<< Updated upstream
+-=======
+-
+-
+-
+->>>>>>> Stashed changes
 diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
 index 1cd5fe443b..15bfb27bc3 100644
 --- a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
