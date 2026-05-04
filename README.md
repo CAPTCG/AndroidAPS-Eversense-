@@ -42,8 +42,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
     git am C:/EversensePatches/0002-Integrate-Eversense-plugin-into-source-plugins.patch
     git am C:/EversensePatches/0003-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
     git am C:/EversensePatches/0004-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
-    git am C:/EversensePatches/0005-Tune-limits-and-add-basal-drift-compensation.patch
-    git am C:/EversensePatches/0006-Maintenance-config-refactors-and-Eversense-related-C.patch
+    git am C:/EversensePatches/0005-Maintenance-config-refactors-and-Eversense-related-C.patch
 
 ### Step 5 - Build
 
@@ -61,8 +60,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
 | `0002` | Source-plugin integration - `EversensePlugin` (BgSource), calibration / placement-guide / status / permission activities, signal-bar drawable, layouts and strings |
 | `0003` | Register Eversense in core enums, DB models, and plugin list - `EVERSENSE_E3` / `EVERSENSE_365` in `SourceSensor`, notification IDs, `GlucoseValue`, DB converter, `PluginsListModule`, `MainApp`, `settings.gradle` |
 | `0004` | UI customizations - rename "Dexcom TIR" header to "Eversense TIR" across 10 locales, add `IcPluginEversense` icon, add transmitter battery % to Overview status lights |
-| `0005` | Tune limits and add basal drift compensation - allowed DIA raised to 10, allowed Profile Switch raised to 150%, basal drift quantification / correction / timezone-aware `integrateExpectedDelivery` |
-| `0006` | Maintenance config refactors and Config cleanup - Export Settings local fix, Eversense DMS credential sync into `SECURE_STATE`, `putCurrentValues` and `putDeviceEvents` for E365 DMS, removal of `enableOmnipodDriftCompensation` from Config |
+| `0005` | Maintenance config refactors and Config cleanup - Export Settings local fix, Eversense DMS credential sync into `SECURE_STATE`, `putCurrentValues` and `putDeviceEvents` for E365 DMS, removal of `enableOmnipodDriftCompensation` from Config |
 
 ---
 

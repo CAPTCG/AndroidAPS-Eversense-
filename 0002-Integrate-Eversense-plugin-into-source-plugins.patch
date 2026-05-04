@@ -1,7 +1,7 @@
-From be78fe7966fea564bee71f4562337ac9f975abed Mon Sep 17 00:00:00 2001
+From 7acca6ea8be84831437b8c24bf24a70289bb8dc9 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
-Date: Mon, 4 May 2026 07:59:43 -0400
-Subject: [PATCH 2/6] Integrate Eversense plugin into source plugins
+Date: Mon, 4 May 2026 08:46:08 -0400
+Subject: [PATCH 2/5] Integrate Eversense plugin into source plugins
 
 - EversensePlugin implementing BgSource interface
 - Calibration, placement guide, and status activities
