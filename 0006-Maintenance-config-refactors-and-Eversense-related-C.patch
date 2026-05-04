@@ -1,25 +1,34 @@
-From cf854a1f8ce02bfa4f775650dcf9af35f4bc1009 Mon Sep 17 00:00:00 2001
+From 320281bc1bae286e14450df02a4ef38431da4379 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
-Date: Sun, 19 Apr 2026 10:52:08 -0400
-Subject: [PATCH] =?UTF-8?q?Fix=20Export=20Settings=20local=20=E2=80=94=20r?=
- =?UTF-8?q?emove=20instance-state=20pendingExportFile?=
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Date: Mon, 4 May 2026 08:03:27 -0400
+Subject: [PATCH 6/6] Maintenance config refactors and Eversense-related Config
+ cleanup
 
-ExportPreparation now carries pendingFile (the DocumentFile created during
-prepareExport). MaintenanceViewModel caches the preparation and passes
-the file directly to executeExport, eliminating the @Reusable-scoped
-instance variable that was null when Hilt provided a different instance
-for the execute call.
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+- Fix Export Settings local: remove instance-state pendingExportFile
+- Fix Eversense DMS upload: sync credentials from AAPS prefs into SECURE_STATE
+- Add putCurrentValues and putDeviceEvents calls for E365 DMS uploads
+- Remove enableOmnipodDriftCompensation from ConfigImpl and PreviewUtils
 ---
+ .../app/aaps/implementations/ConfigImpl.kt     |  3 ++-
  .../maintenance/ImportExportPrefs.kt           |  6 ++++--
+ core/keys/src/main/res/values/strings.xml      |  4 ++++
+ .../core/ui/compose/preference/PreviewUtils.kt |  2 ++
  .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
  .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
- 3 files changed, 21 insertions(+), 13 deletions(-)
+ 6 files changed, 29 insertions(+), 14 deletions(-)
 
+diff --git a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
+index 06cdc76dc3..357bf1c043 100644
+--- a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
++++ b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
+@@ -74,4 +74,5 @@ class ConfigImpl @Inject constructor(
+         enabledOptionsCache.getOrPut(option) {
+             fileListProvider.get().ensureExtraDirExists()?.findFile(option.filename) != null
+         }
+-}
+\ No newline at end of file
++}
++
 diff --git a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt
 index 9341b25797..19152f8214 100644
 --- a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/maintenance/ImportExportPrefs.kt
@@ -51,11 +60,34 @@ index 9341b25797..19152f8214 100644
  
      /** Cache the password for future exports. Returns the (possibly transformed) password to use. */
      fun cacheExportPassword(password: String): String
+diff --git a/core/keys/src/main/res/values/strings.xml b/core/keys/src/main/res/values/strings.xml
+index 3ace3e48d7..c6d77a1cef 100644
+--- a/core/keys/src/main/res/values/strings.xml
++++ b/core/keys/src/main/res/values/strings.xml
+@@ -458,4 +458,8 @@
+     <!--    Appearance preferences-->
+     <string name="prefs_range_title">Range for visualization</string>
+ 
++    <string name="eversense_use_smoothing">Use ESEL smoothing</string>
++    <string name="eversense_cloud_upload_enabled">Enable Eversense cloud upload</string>
++    <string name="eversense_cloud_upload_toast">Show cloud upload result</string>
+ </resources>
++
+diff --git a/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt b/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt
+index 75180d6357..fac9606511 100644
+--- a/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt
++++ b/core/ui/src/main/kotlin/app/aaps/core/ui/compose/preference/PreviewUtils.kt
+@@ -174,3 +174,5 @@ private object PreviewConfig : Config {
+     override fun isEnabled(option: ExternalOptions): Boolean = false
+ }
+ 
++
++
 diff --git a/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt b/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
-index 1540f28a57..9da53f4a02 100644
+index 95e21f3197..2e7265c24b 100644
 --- a/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
 +++ b/implementation/src/main/kotlin/app/aaps/implementation/maintenance/ImportExportPrefsImpl.kt
-@@ -104,8 +104,6 @@ class ImportExportPrefsImpl @Inject constructor(
+@@ -107,8 +107,6 @@ class ImportExportPrefsImpl @Inject constructor(
      private val storage: Storage
  ) : ImportExportPrefs {
  
@@ -64,7 +96,7 @@ index 1540f28a57..9da53f4a02 100644
      // Compose export support — discrete steps
  
      override fun isMasterPasswordSet(): Boolean =
-@@ -191,10 +189,10 @@ class ImportExportPrefsImpl @Inject constructor(
+@@ -194,10 +192,10 @@ class ImportExportPrefsImpl @Inject constructor(
          }
  
          // For LOCAL / BOTH we need a local file
@@ -77,7 +109,7 @@ index 1540f28a57..9da53f4a02 100644
          }
  
          val (password, isExpired, isAboutToExpire) = exportPasswordDataStore.getPasswordFromDataStore(context)
-@@ -205,19 +203,20 @@ class ImportExportPrefsImpl @Inject constructor(
+@@ -208,19 +206,20 @@ class ImportExportPrefsImpl @Inject constructor(
  
          val displayFileName = when (destination) {
              ExportDestination.CLOUD -> config.cloudDisplayName ?: "Cloud"
@@ -102,7 +134,7 @@ index 1540f28a57..9da53f4a02 100644
          val config = getExportConfig()
          val localEnabled = config.settingsLocal
          val cloudEnabled = config.settingsCloud && config.isCloudActive
-@@ -233,9 +232,8 @@ class ImportExportPrefsImpl @Inject constructor(
+@@ -236,9 +235,8 @@ class ImportExportPrefsImpl @Inject constructor(
  
          // Local export
          if (destination == ExportDestination.LOCAL || destination == ExportDestination.BOTH) {

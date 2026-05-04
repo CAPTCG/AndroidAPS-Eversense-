@@ -1,0 +1,219 @@
+From 1a6e947c48e4388bdef1f7176d3a224b48d49d5f Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Mon, 4 May 2026 08:01:30 -0400
+Subject: [PATCH 4/6] UI: Eversense customizations (TIR rename, transmitter
+ battery, plugin icon)
+
+- Rename 'Dexcom TIR' header to 'Eversense TIR' in Statistics across 10 locales
+- Add Eversense plugin icon (IcPluginEversense)
+- Add transmitter battery percentage to Overview status lights
+---
+ .../aaps/ui/compose/overview/statusLights/StatusViewModel.kt   | 2 +-
+ ui/src/main/res/values-es-rES/strings.xml                      | 3 ++-
+ ui/src/main/res/values-fr-rFR/strings.xml                      | 3 ++-
+ ui/src/main/res/values-it-rIT/strings.xml                      | 3 ++-
+ ui/src/main/res/values-nb-rNO/strings.xml                      | 3 ++-
+ ui/src/main/res/values-ro-rRO/strings.xml                      | 3 ++-
+ ui/src/main/res/values-sk-rSK/strings.xml                      | 3 ++-
+ ui/src/main/res/values-vi-rVN/strings.xml                      | 3 ++-
+ ui/src/main/res/values-zh-rCN/strings.xml                      | 3 ++-
+ ui/src/main/res/values-zh-rTW/strings.xml                      | 3 ++-
+ ui/src/main/res/values/strings.xml                             | 3 ++-
+ 11 files changed, 21 insertions(+), 11 deletions(-)
+
+diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
+index 04c1c44bdd..f72eee78c8 100644
+--- a/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
++++ b/ui/src/main/kotlin/app/aaps/ui/compose/overview/statusLights/StatusViewModel.kt
+@@ -137,7 +137,7 @@ class StatusViewModel @Inject constructor(
+             levelStatus = if (levelPercent >= 0) getLevelStatus((levelPercent * 100).toDouble(), IntKey.OverviewSbatWarning, IntKey.OverviewSbatCritical) else StatusLevel.UNSPECIFIED,
+             levelPercent = if (levelPercent >= 0) 1f - levelPercent else -1f,
+             icon = IcCgmInsert,
+-            compactLevel = false // Overview: sensor battery not shown
++            compactLevel = true // Overview: show sensor battery
+         )
+     }
+ 
+diff --git a/ui/src/main/res/values-es-rES/strings.xml b/ui/src/main/res/values-es-rES/strings.xml
+index 3b4641e1cc..66f24df050 100644
+--- a/ui/src/main/res/values-es-rES/strings.xml
++++ b/ui/src/main/res/values-es-rES/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Monitor de actividad</string>
+     <string name="time_range">Rango de tiempo</string>
+-    <string name="dexcom_tir">TIR de Dexcom</string>
++    <string name="dexcom_tir">TIR de Eversense</string>
+     <string name="cgp_title">Pentágono de glucosa (CGP) — 14 días</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -302,3 +302,4 @@
+     <string name="widget_rm_suspended">Suspendido</string>
+     <string name="widget_rm_resume">Reanudar</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-fr-rFR/strings.xml b/ui/src/main/res/values-fr-rFR/strings.xml
+index a5859632b1..2ec086edb6 100644
+--- a/ui/src/main/res/values-fr-rFR/strings.xml
++++ b/ui/src/main/res/values-fr-rFR/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Moniteur d\'activité</string>
+     <string name="time_range">Plage horaire</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Pentagone glucose (CGP) – 14 jours</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -302,3 +302,4 @@
+     <string name="widget_rm_suspended">Suspendu</string>
+     <string name="widget_rm_resume">Reprendre</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-it-rIT/strings.xml b/ui/src/main/res/values-it-rIT/strings.xml
+index bfe9a7adbe..23da273d69 100644
+--- a/ui/src/main/res/values-it-rIT/strings.xml
++++ b/ui/src/main/res/values-it-rIT/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Monitor attività</string>
+     <string name="time_range">Intervallo di tempo</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Glucosio Pentagon (CGP) — 14 giorni</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -302,3 +302,4 @@
+     <string name="widget_rm_suspended">Sospeso</string>
+     <string name="widget_rm_resume">Riprendi</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-nb-rNO/strings.xml b/ui/src/main/res/values-nb-rNO/strings.xml
+index 136132a71c..3a7a3aa109 100644
+--- a/ui/src/main/res/values-nb-rNO/strings.xml
++++ b/ui/src/main/res/values-nb-rNO/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Aktivitetsmonitor</string>
+     <string name="time_range">Tidsrom</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Glukose Pentagon (CGP) – 14 dager</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -302,3 +302,4 @@
+     <string name="widget_rm_suspended">Pauset</string>
+     <string name="widget_rm_resume">Gjenoppta</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-ro-rRO/strings.xml b/ui/src/main/res/values-ro-rRO/strings.xml
+index 6c1aee593a..18b011f7b7 100644
+--- a/ui/src/main/res/values-ro-rRO/strings.xml
++++ b/ui/src/main/res/values-ro-rRO/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Monitor activitate</string>
+     <string name="time_range">Interval de timp</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Pentagon glicemie (CGP) - 14 zile</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -291,3 +291,4 @@
+     <string name="widget_rm_suspended">Suspendat</string>
+     <string name="widget_rm_resume">Reluați</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-sk-rSK/strings.xml b/ui/src/main/res/values-sk-rSK/strings.xml
+index 00f502feb1..0c90b58a6b 100644
+--- a/ui/src/main/res/values-sk-rSK/strings.xml
++++ b/ui/src/main/res/values-sk-rSK/strings.xml
+@@ -14,7 +14,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Monitor aktivity</string>
+     <string name="time_range">Časový rozsah</string>
+-    <string name="dexcom_tir">Čas v rozsahu Dexcom</string>
++    <string name="dexcom_tir">Čas v rozsahu Eversense</string>
+     <string name="cgp_title">Glucose Pentagon (CGP) - 14 dní</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -230,3 +230,4 @@
+     <string name="widget_rm_suspended">Pozastavený</string>
+     <string name="widget_rm_resume">Obnoviť</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-vi-rVN/strings.xml b/ui/src/main/res/values-vi-rVN/strings.xml
+index 35a3c7baff..7ae4ac9ae7 100644
+--- a/ui/src/main/res/values-vi-rVN/strings.xml
++++ b/ui/src/main/res/values-vi-rVN/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Màn hình hoạt động</string>
+     <string name="time_range">Khoảng thời gian</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Glucose Pentagon (CGP) — 14 days</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -231,3 +231,4 @@
+     <string name="widget_rm_suspended">Bị tạm dừng</string>
+     <string name="widget_rm_resume">Tiếp tục</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-zh-rCN/strings.xml b/ui/src/main/res/values-zh-rCN/strings.xml
+index b1420e7822..8f113b36f4 100644
+--- a/ui/src/main/res/values-zh-rCN/strings.xml
++++ b/ui/src/main/res/values-zh-rCN/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">活动监视器</string>
+     <string name="time_range">时间范围</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">血糖五边形（CGP）- 14天</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -302,3 +302,4 @@
+     <string name="widget_rm_suspended">已暂停</string>
+     <string name="widget_rm_resume">恢复</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values-zh-rTW/strings.xml b/ui/src/main/res/values-zh-rTW/strings.xml
+index 27771d0498..ce67910ebe 100644
+--- a/ui/src/main/res/values-zh-rTW/strings.xml
++++ b/ui/src/main/res/values-zh-rTW/strings.xml
+@@ -15,7 +15,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">活動監視器</string>
+     <string name="time_range">時間範圍</string>
+-    <string name="dexcom_tir">Dexcom 目標範圍內</string>
++    <string name="dexcom_tir">Eversense 目標範圍時間</string>
+     <string name="cgp_title">血糖五邊形 (CGP) — 14 天</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -231,3 +231,4 @@
+     <string name="widget_rm_suspended">已暫停</string>
+     <string name="widget_rm_resume">恢復</string>
+ </resources>
++
+diff --git a/ui/src/main/res/values/strings.xml b/ui/src/main/res/values/strings.xml
+index 6a5d8caba0..3e24d341f7 100644
+--- a/ui/src/main/res/values/strings.xml
++++ b/ui/src/main/res/values/strings.xml
+@@ -18,7 +18,7 @@
+     <!--     Activities-->
+     <string name="activity_monitor">Activity monitor</string>
+     <string name="time_range">Time range</string>
+-    <string name="dexcom_tir">Dexcom TIR</string>
++    <string name="dexcom_tir">Eversense TIR</string>
+     <string name="cgp_title">Glucose Pentagon (CGP) — 14 days</string>
+     <string name="cgp_tor" comment="Glucose Pentagon axis: Time out of Range">ToR</string>
+     <string name="cgp_cv" comment="Glucose Pentagon axis: Coefficient of Variation">\%CV</string>
+@@ -327,3 +327,4 @@
+     <string name="widget_rm_resume">Resume</string>
+ 
+ </resources>
++
+-- 
+2.45.1.windows.1
+

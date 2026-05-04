@@ -1,0 +1,175 @@
+From 778a64d3f0eaf7291611674b514e85f3e5f82a6c Mon Sep 17 00:00:00 2001
+From: Craig Gordon <craighvac@gmail.com>
+Date: Mon, 4 May 2026 08:00:33 -0400
+Subject: [PATCH 3/6] Register Eversense in core enums, DB models, and plugin
+ list
+
+- Add EVERSENSE_E3 and EVERSENSE_365 to SourceSensor enum
+- Add Eversense notification IDs to NotificationId
+- Update GlucoseValue and DB converter for new sensor types
+- Wire Eversense module in PluginsListModule, MainApp, settings.gradle
+---
+ app/src/main/kotlin/app/aaps/MainApp.kt                   | 3 +++
+ app/src/main/kotlin/app/aaps/di/PluginsListModule.kt      | 8 +++++++-
+ .../main/kotlin/app/aaps/core/data/model/SourceSensor.kt  | 2 ++
+ .../app/aaps/core/data/model/SourceSensorExtensions.kt    | 2 ++
+ .../aaps/core/data/model/SourceSensorExtensionsTest.kt    | 8 +++++++-
+ .../aaps/core/interfaces/notifications/NotificationId.kt  | 4 ++++
+ .../kotlin/app/aaps/database/entities/GlucoseValue.kt     | 2 ++
+ .../persistence/converters/SourceSensorExtension.kt       | 4 ++++
+ settings.gradle                                           | 1 +
+ 9 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/app/src/main/kotlin/app/aaps/MainApp.kt b/app/src/main/kotlin/app/aaps/MainApp.kt
+index f8ec693901..4736ef9218 100644
+--- a/app/src/main/kotlin/app/aaps/MainApp.kt
++++ b/app/src/main/kotlin/app/aaps/MainApp.kt
+@@ -445,6 +445,9 @@ class MainApp : Application(), HasAndroidInjector {
+         }
+         // Clear SmsOtpPassword if wrongly replaced
+         if (preferences.get(StringKey.SmsOtpPassword).length > 10) preferences.put(StringKey.SmsOtpPassword, "")
++        // Raise sensor battery thresholds from old defaults (25/5) to new defaults (40/20)
++        if (preferences.get(IntKey.OverviewSbatWarning) == 25) preferences.put(IntKey.OverviewSbatWarning, 40)
++        if (preferences.get(IntKey.OverviewSbatCritical) == 5) preferences.put(IntKey.OverviewSbatCritical, 20)
+ 
+         val keys: Map<String, *> = sp.getAll()
+         // Migrate ActivityMonitor
+diff --git a/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt b/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
+index bf8f5929bf..996b8d4d06 100644
+--- a/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
++++ b/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
+@@ -25,6 +25,7 @@ import app.aaps.plugins.smoothing.AvgSmoothingPlugin
+ import app.aaps.plugins.smoothing.ExponentialSmoothingPlugin
+ import app.aaps.plugins.smoothing.NoSmoothingPlugin
+ import app.aaps.plugins.source.DexcomPlugin
++import app.aaps.plugins.source.EversensePlugin
+ import app.aaps.plugins.source.GlimpPlugin
+ import app.aaps.plugins.source.GlunovoPlugin
+ import app.aaps.plugins.source.IntelligoPlugin
+@@ -266,6 +267,11 @@ abstract class PluginsListModule {
+     @IntoMap
+     @IntKey(440)
+     abstract fun bindDexcomPlugin(plugin: DexcomPlugin): PluginBase
++    @Binds
++    @AllConfigs
++    @IntoMap
++    @IntKey(445)
++    abstract fun bindEversensePlugin(plugin: EversensePlugin): PluginBase
+ 
+     @Binds
+     @AllConfigs
+@@ -356,4 +362,4 @@ abstract class PluginsListModule {
+ 
+     @Qualifier
+     annotation class Unfinished
+-}
+\ No newline at end of file
++}
+diff --git a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
+index aa6a18dfb8..17a5d384b4 100644
+--- a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
++++ b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
+@@ -31,6 +31,8 @@ enum class SourceSensor(val text: String) {
+     SIBIONIC("SI App"),
+     SINO("Sino App"),
+     EVERSENSE("Eversense"),
++    EVERSENSE_E3("Eversense E3"),
++    EVERSENSE_365("Eversense 365"),
+     AIDEX("GlucoRx Aidex"),
+     SYAI_TAG("Syai Tag"),
+     INSTARA("Instara"),
+diff --git a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensorExtensions.kt b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensorExtensions.kt
+index 0880a4bafc..1a79742a28 100644
+--- a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensorExtensions.kt
++++ b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensorExtensions.kt
+@@ -14,4 +14,6 @@ private val ADVANCED_FILTERING_SENSORS = setOf(
+     SourceSensor.LIBRE_3,
+     SourceSensor.SYAI_TAG,
+     SourceSensor.RANDOM,
++    SourceSensor.EVERSENSE_365,
++    SourceSensor.EVERSENSE_E3,
+ )
+diff --git a/core/data/src/test/kotlin/app/aaps/core/data/model/SourceSensorExtensionsTest.kt b/core/data/src/test/kotlin/app/aaps/core/data/model/SourceSensorExtensionsTest.kt
+index a12bc51baa..c1a62d7cb1 100644
+--- a/core/data/src/test/kotlin/app/aaps/core/data/model/SourceSensorExtensionsTest.kt
++++ b/core/data/src/test/kotlin/app/aaps/core/data/model/SourceSensorExtensionsTest.kt
+@@ -35,7 +35,13 @@ class SourceSensorExtensionsTest {
+     }
+ 
+     @Test
+-    fun `eversense does not support advanced filtering`() {
++    fun `eversense 365 and e3 support advanced filtering`() {
++        assertThat(SourceSensor.EVERSENSE_365.advancedFilteringSupported()).isTrue()
++        assertThat(SourceSensor.EVERSENSE_E3.advancedFilteringSupported()).isTrue()
++    }
++
++    @Test
++    fun `eversense legacy does not support advanced filtering`() {
+         assertThat(SourceSensor.EVERSENSE.advancedFilteringSupported()).isFalse()
+     }
+ 
+diff --git a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
+index 9b28f02595..b07d90cbb3 100644
+--- a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
++++ b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
+@@ -93,6 +93,10 @@ enum class NotificationId(
+ 
+     // CGM
+     BG_READINGS_MISSED(27, URGENT, CGM),
++    EVERSENSE_ALARM(95, URGENT, CGM, allowMultiple = true),
++    EVERSENSE_FIRMWARE(96, INFO, CGM),
++    EVERSENSE_RELEASE(97, INFO, CGM),
++    EVERSENSE_PLACEMENT(98, URGENT, CGM),
+ 
+     // Loop / APS
+     EASY_MODE_ENABLED(2, URGENT, LOOP),
+diff --git a/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt b/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
+index f46aeebb7d..ee84692b14 100644
+--- a/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
++++ b/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
+@@ -93,6 +93,8 @@ data class GlucoseValue(
+         MM_600_SERIES,
+         MM_SIMPLERA,
+         EVERSENSE,
++        EVERSENSE_E3,
++        EVERSENSE_365,
+         AIDEX,
+         RANDOM,
+         UNKNOWN,
+diff --git a/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt b/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
+index b6490a96b9..2515905029 100644
+--- a/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
++++ b/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
+@@ -32,6 +32,8 @@ fun GlucoseValue.SourceSensor.fromDb(): SourceSensor =
+         GlucoseValue.SourceSensor.MM_600_SERIES          -> SourceSensor.MM_600_SERIES
+         GlucoseValue.SourceSensor.MM_SIMPLERA            -> SourceSensor.MM_SIMPLERA
+         GlucoseValue.SourceSensor.EVERSENSE              -> SourceSensor.EVERSENSE
++        GlucoseValue.SourceSensor.EVERSENSE_E3           -> SourceSensor.EVERSENSE_E3
++        GlucoseValue.SourceSensor.EVERSENSE_365          -> SourceSensor.EVERSENSE_365
+         GlucoseValue.SourceSensor.AIDEX                  -> SourceSensor.AIDEX
+         GlucoseValue.SourceSensor.RANDOM                 -> SourceSensor.RANDOM
+         GlucoseValue.SourceSensor.UNKNOWN                -> SourceSensor.UNKNOWN
+@@ -77,6 +79,8 @@ fun SourceSensor.toDb(): GlucoseValue.SourceSensor =
+         SourceSensor.MM_600_SERIES          -> GlucoseValue.SourceSensor.MM_600_SERIES
+         SourceSensor.MM_SIMPLERA            -> GlucoseValue.SourceSensor.MM_SIMPLERA
+         SourceSensor.EVERSENSE              -> GlucoseValue.SourceSensor.EVERSENSE
++        SourceSensor.EVERSENSE_E3           -> GlucoseValue.SourceSensor.EVERSENSE_E3
++        SourceSensor.EVERSENSE_365          -> GlucoseValue.SourceSensor.EVERSENSE_365
+         SourceSensor.AIDEX                  -> GlucoseValue.SourceSensor.AIDEX
+         SourceSensor.RANDOM                 -> GlucoseValue.SourceSensor.RANDOM
+         SourceSensor.UNKNOWN                -> GlucoseValue.SourceSensor.UNKNOWN
+diff --git a/settings.gradle b/settings.gradle
+index 21015199ad..10e53beefe 100644
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -23,6 +23,7 @@ include ':plugins:main'
+ include ':plugins:sensitivity'
+ include ':plugins:smoothing'
+ include ':plugins:source'
++include ':plugins:eversense'
+ include ':plugins:sync'
+ include ':pump:combov2'
+ include ':pump:combov2:comboctl'
+-- 
+2.45.1.windows.1
+

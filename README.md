@@ -36,31 +36,14 @@ Before applying patches, make sure you are on the `dev` branch. In Android Studi
 
 ### Step 4 - Apply the patches
 
-Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
+Open the **Terminal** in Android Studio (bottom toolbar) and run each line in order:
 
-    git am C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
-    git am C:/EversensePatches/0002-E3-fixes-SingleByte-packets-force-sync-TOO_SOON-dark.patch
-    git am C:/EversensePatches/0003-Fix-TOO_SOON-calibration-summary-display-in-dark-mod.patch
-    git am C:/EversensePatches/0004-Sync-Eversense-plugin-to-latest-from-AndroidAPSEvers.patch
-    git am C:/EversensePatches/0005-pushing-changes.patch
-    git am C:/EversensePatches/0006-Fix-suppress-Recalculated-Data-Used-warning-for-Ever.patch
-    git am C:/EversensePatches/0007-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
-    git am C:/EversensePatches/0008-Add-EversenseStatusActivity-fix-plugin-registration-.patch
-    git am C:/EversensePatches/0009-Fix-remove-deprecated-pluginIcon-after-upstream-API-.patch
-    git am C:/EversensePatches/0010-Update-Eversense-add-icon-sign-out-calibration-info-.patch
-    git am C:/EversensePatches/0011-Fix-Eversense-DMS-upload-sync-credentials-from-AAPS-.patch
-    git am C:/EversensePatches/0012-Fix-AAPT-resource-linking-replace-attr-refs-with-dir.patch
-    git am C:/EversensePatches/0013-Remove-orphaned-source_item.xml-unused-after-upstrea.patch
-    git am C:/EversensePatches/0014-Register-Eversense-activities-in-ActivitiesModule-fo.patch
-    git am C:/EversensePatches/0015-Migrate-Eversense-activities-from-DaggerAppCompatAct.patch
-    git am C:/EversensePatches/0016-Remove-Eversense-activities-from-ActivitiesModule-Hi.patch
-    git am C:/EversensePatches/0017-Migrate-HistoryBrowseActivity-to-Hilt-AndroidEntryPo.patch
-    git am C:/EversensePatches/0018-Remove-ActivitiesModule-all-activities-use-Hilt-Andr.patch
-    git am C:/EversensePatches/0019-Add-Eversense-transmitter-battery-to-Overview-status.patch
-    git am C:/EversensePatches/0020-Fix-Eversense-DMS-portal-sync-add-putCurrentValues-a.patch
-    git am C:/EversensePatches/0021-Add-putCurrentValues-and-putDeviceEvents-calls-for-E.patch
-    git am C:/EversensePatches/0022-Fix-Export-Settings-local-remove-instance-state-pend.patch
-    git am C:/EversensePatches/0023-Raise-transmitter-battery-default-thresholds-to-40-2.patch
+    git am C:/EversensePatches/0001-Add-Eversense-E3-365-BLE-driver-plugin.patch
+    git am C:/EversensePatches/0002-Integrate-Eversense-plugin-into-source-plugins.patch
+    git am C:/EversensePatches/0003-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
+    git am C:/EversensePatches/0004-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
+    git am C:/EversensePatches/0005-Tune-limits-and-add-basal-drift-compensation.patch
+    git am C:/EversensePatches/0006-Maintenance-config-refactors-and-Eversense-related-C.patch
 
 ### Step 5 - Build
 
@@ -74,29 +57,12 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 
 | Patch | Description |
 | --- | --- |
-| `0001` | Eversense E3/365 CGM plugin - core BLE driver and AAPS integration |
-| `0002` | E3 fixes - SingleByte packets, force sync, calibration |
-| `0003` | Fix TOO_SOON calibration display in dark mode |
-| `0004` | Sync Eversense plugin with latest updates |
-| `0005` | Additional Eversense updates |
-| `0006` | Fix: suppress Recalculated Data Used yellow triangle warning for E3 and E365 |
-| `0007` | Fix: migrate EversensePlugin preferences to Compose API for latest dev branch |
-| `0008` | Add Eversense status activity, fix plugin registration, add credentials and calibration preferences |
-| `0009` | Fix: remove deprecated pluginIcon after upstream API change |
-| `0010` | Add Eversense icon, sign out, calibration info, placement signal label |
-| `0011` | Fix Eversense DMS upload — sync credentials from AAPS prefs into SECURE_STATE |
-| `0012` | Fix AAPT resource linking — replace attr refs with direct colors in source_item.xml |
-| `0013` | Remove orphaned source_item.xml — unused after upstream Compose migration |
-| `0014` | Register Eversense activities in ActivitiesModule for Dagger injection |
-| `0015` | Migrate Eversense activities from DaggerAppCompatActivity to Hilt AndroidEntryPoint |
-| `0016` | Remove Eversense activities from ActivitiesModule — Hilt auto-discovers |
-| `0017` | Migrate HistoryBrowseActivity to Hilt AndroidEntryPoint, remove from ActivitiesModule |
-| `0018` | Remove ActivitiesModule — all activities use Hilt AndroidEntryPoint |
-| `0019` | Add Eversense transmitter battery % to Overview status lights (Compose) |
-| `0020` | Fix Eversense DMS portal sync — add putCurrentValues and putDeviceEvents calls |
-| `0021` | Add putCurrentValues and putDeviceEvents calls for E365 DMS uploads |
-| `0022` | Fix Export Settings local — remove instance-state pendingExportFile |
-| `0023` | Raise transmitter battery default thresholds to 40%/20% |
+| `0001` | Eversense E3/365 BLE driver plugin - complete `plugins/eversense` module with BluetoothManager, GATT callback, all read/write/calibration/diagnostic-mode/signal-strength packets, SecureV2 crypto for 365, state management and watcher interface |
+| `0002` | Source-plugin integration - `EversensePlugin` (BgSource), calibration / placement-guide / status / permission activities, signal-bar drawable, layouts and strings |
+| `0003` | Register Eversense in core enums, DB models, and plugin list - `EVERSENSE_E3` / `EVERSENSE_365` in `SourceSensor`, notification IDs, `GlucoseValue`, DB converter, `PluginsListModule`, `MainApp`, `settings.gradle` |
+| `0004` | UI customizations - rename "Dexcom TIR" header to "Eversense TIR" across 10 locales, add `IcPluginEversense` icon, add transmitter battery % to Overview status lights |
+| `0005` | Tune limits and add basal drift compensation - allowed DIA raised to 10, allowed Profile Switch raised to 150%, basal drift quantification / correction / timezone-aware `integrateExpectedDelivery` |
+| `0006` | Maintenance config refactors and Config cleanup - Export Settings local fix, Eversense DMS credential sync into `SECURE_STATE`, `putCurrentValues` and `putDeviceEvents` for E365 DMS, removal of `enableOmnipodDriftCompensation` from Config |
 
 ---
 
@@ -112,6 +78,3 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line:
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
-
-
-
