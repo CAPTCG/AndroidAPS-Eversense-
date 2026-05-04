@@ -1,4 +1,4 @@
-From bc1b940c67d9e045a48a9df7d40d593d5cf8b900 Mon Sep 17 00:00:00 2001
+From 732756731fde3c61855e2a310d08b7a4dba3b3d2 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Wed, 1 Apr 2026 19:13:27 -0400
 Subject: [PATCH] Add Eversense E3/365 CGM plugin
@@ -149,7 +149,7 @@ Subject: [PATCH] Add Eversense E3/365 CGM plugin
  .../EversenseCalibrationActivity.kt           |  85 +++
  .../activities/EversensePlacementActivity.kt  | 148 +++++
  .../RequestEversensePermissionActivity.kt     |  40 ++
- .../aaps/plugins/source/di/SourceModule.kt    |   8 +
+ .../aaps/plugins/source/di/SourceModule.kt    |   9 +
  .../res/drawable/eversense_signal_bar.xml     |   6 +
  .../layout/activity_eversense_calibration.xml |  81 +++
  .../layout/activity_eversense_placement.xml   | 117 ++++
@@ -158,7 +158,7 @@ Subject: [PATCH] Add Eversense E3/365 CGM plugin
  plugins/source/src/main/res/values/colors.xml |   8 +
  .../source/src/main/res/values/strings.xml    |  62 ++
  settings.gradle                               |   1 +
- 144 files changed, 7007 insertions(+)
+ 144 files changed, 7008 insertions(+)
  create mode 100644 plugins/eversense/build.gradle.kts
  create mode 100644 plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseCGMPlugin.kt
  create mode 100644 plugins/eversense/src/main/kotlin/com/nightscout/eversense/EversenseGattCallback.kt
@@ -295,10 +295,10 @@ Subject: [PATCH] Add Eversense E3/365 CGM plugin
  create mode 100644 plugins/source/src/main/res/values/colors.xml
 
 diff --git a/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt b/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
-index e338b0c246..e733780d3a 100644
+index bf8f5929bf..9ab2f5ce76 100644
 --- a/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
 +++ b/app/src/main/kotlin/app/aaps/di/PluginsListModule.kt
-@@ -26,6 +26,7 @@ import app.aaps.plugins.smoothing.AvgSmoothingPlugin
+@@ -25,6 +25,7 @@ import app.aaps.plugins.smoothing.AvgSmoothingPlugin
  import app.aaps.plugins.smoothing.ExponentialSmoothingPlugin
  import app.aaps.plugins.smoothing.NoSmoothingPlugin
  import app.aaps.plugins.source.DexcomPlugin
@@ -306,7 +306,7 @@ index e338b0c246..e733780d3a 100644
  import app.aaps.plugins.source.GlimpPlugin
  import app.aaps.plugins.source.GlunovoPlugin
  import app.aaps.plugins.source.IntelligoPlugin
-@@ -272,6 +273,7 @@ abstract class PluginsListModule {
+@@ -266,6 +267,7 @@ abstract class PluginsListModule {
      @IntoMap
      @IntKey(440)
      abstract fun bindDexcomPlugin(plugin: DexcomPlugin): PluginBase
@@ -315,7 +315,7 @@ index e338b0c246..e733780d3a 100644
      @Binds
      @AllConfigs
 diff --git a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
-index ffb7ca41d0..9026c57d2d 100644
+index aa6a18dfb8..17a5d384b4 100644
 --- a/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
 +++ b/core/data/src/main/kotlin/app/aaps/core/data/model/SourceSensor.kt
 @@ -31,6 +31,8 @@ enum class SourceSensor(val text: String) {
@@ -326,9 +326,9 @@ index ffb7ca41d0..9026c57d2d 100644
 +    EVERSENSE_365("Eversense 365"),
      AIDEX("GlucoRx Aidex"),
      SYAI_TAG("Syai Tag"),
-     RANDOM("Random"),
+     INSTARA("Instara"),
 diff --git a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
-index 0625ae993a..98f9469aa3 100644
+index 9b28f02595..b07d90cbb3 100644
 --- a/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
 +++ b/core/interfaces/src/main/kotlin/app/aaps/core/interfaces/notifications/NotificationId.kt
 @@ -93,6 +93,10 @@ enum class NotificationId(
@@ -343,7 +343,7 @@ index 0625ae993a..98f9469aa3 100644
      // Loop / APS
      EASY_MODE_ENABLED(2, URGENT, LOOP),
 diff --git a/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt b/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
-index aff2ba7f99..5dabc75bd8 100644
+index f46aeebb7d..ee84692b14 100644
 --- a/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
 +++ b/database/impl/src/main/kotlin/app/aaps/database/entities/GlucoseValue.kt
 @@ -93,6 +93,8 @@ data class GlucoseValue(
@@ -356,7 +356,7 @@ index aff2ba7f99..5dabc75bd8 100644
          RANDOM,
          UNKNOWN,
 diff --git a/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt b/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
-index d352ab051a..fd6d0a0f8f 100644
+index b6490a96b9..2515905029 100644
 --- a/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
 +++ b/database/persistence/src/main/kotlin/app/aaps/database/persistence/converters/SourceSensorExtension.kt
 @@ -32,6 +32,8 @@ fun GlucoseValue.SourceSensor.fromDb(): SourceSensor =
@@ -368,7 +368,7 @@ index d352ab051a..fd6d0a0f8f 100644
          GlucoseValue.SourceSensor.AIDEX                  -> SourceSensor.AIDEX
          GlucoseValue.SourceSensor.RANDOM                 -> SourceSensor.RANDOM
          GlucoseValue.SourceSensor.UNKNOWN                -> SourceSensor.UNKNOWN
-@@ -76,6 +78,8 @@ fun SourceSensor.toDb(): GlucoseValue.SourceSensor =
+@@ -77,6 +79,8 @@ fun SourceSensor.toDb(): GlucoseValue.SourceSensor =
          SourceSensor.MM_600_SERIES          -> GlucoseValue.SourceSensor.MM_600_SERIES
          SourceSensor.MM_SIMPLERA            -> GlucoseValue.SourceSensor.MM_SIMPLERA
          SourceSensor.EVERSENSE              -> GlucoseValue.SourceSensor.EVERSENSE
@@ -7862,21 +7862,22 @@ index 0000000000..85654f5732
 +}
 \ No newline at end of file
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt
-index 3b14f4210a..c6f2716d20 100644
+index 139ace2237..19683b1217 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/di/SourceModule.kt
-@@ -14,6 +14,10 @@ import app.aaps.plugins.source.SyaiPlugin
- import app.aaps.plugins.source.TomatoPlugin
- import app.aaps.plugins.source.XdripSourcePlugin
+@@ -16,6 +16,11 @@ import app.aaps.plugins.source.XdripSourcePlugin
  import app.aaps.plugins.source.activities.RequestDexcomPermissionActivity
+ import app.aaps.plugins.source.instara.InstaraPlugin
+ import app.aaps.plugins.source.instara.InstaraStaleCheckWorker
 +import app.aaps.plugins.source.EversensePlugin
 +import app.aaps.plugins.source.activities.EversenseCalibrationActivity
 +import app.aaps.plugins.source.activities.EversensePlacementActivity
 +import app.aaps.plugins.source.activities.RequestEversensePermissionActivity
++>>>>>>> bc1b940c67 (Add Eversense E3/365 CGM plugin)
  import app.aaps.plugins.source.notificationreader.NotificationCollectorService
  import dagger.Binds
  import dagger.Module
-@@ -41,6 +45,10 @@ abstract class SourceModule {
+@@ -43,6 +48,10 @@ abstract class SourceModule {
      @ContributesAndroidInjector abstract fun contributesSinoAppWorker(): PatchedSinoAppPlugin.PatchedSinoAppWorker
  
      @ContributesAndroidInjector abstract fun contributesRequestDexcomPermissionActivity(): RequestDexcomPermissionActivity
@@ -7886,7 +7887,7 @@ index 3b14f4210a..c6f2716d20 100644
 +    @ContributesAndroidInjector abstract fun contributesEversensePlacementActivity(): EversensePlacementActivity
      @ContributesAndroidInjector abstract fun contributesNotificationCollectorService(): NotificationCollectorService
  
-     @Module
+     // Instara related worker
 diff --git a/plugins/source/src/main/res/drawable/eversense_signal_bar.xml b/plugins/source/src/main/res/drawable/eversense_signal_bar.xml
 new file mode 100644
 index 0000000000..02abad050c
@@ -8250,10 +8251,10 @@ index 0000000000..4cd50c0421
 +</resources>
 \ No newline at end of file
 diff --git a/plugins/source/src/main/res/values/strings.xml b/plugins/source/src/main/res/values/strings.xml
-index d683b3ae15..9c7f7704e1 100644
+index 3d41488b93..84e64fba71 100644
 --- a/plugins/source/src/main/res/values/strings.xml
 +++ b/plugins/source/src/main/res/values/strings.xml
-@@ -44,4 +44,66 @@
+@@ -51,4 +51,66 @@
      <string name="permission_dexcom_description">Application needs permission to receive CGM data from Dexcom app</string>
      <string name="permission_notification_listener_title">Notification Access</string>
      <string name="permission_notification_listener_description">Required to read glucose values from CGM app notifications</string>
@@ -8322,10 +8323,10 @@ index d683b3ae15..9c7f7704e1 100644
  </resources>
 \ No newline at end of file
 diff --git a/settings.gradle b/settings.gradle
-index f1fc29b64f..b6f07b4bb5 100644
+index 21015199ad..10e53beefe 100644
 --- a/settings.gradle
 +++ b/settings.gradle
-@@ -25,6 +25,7 @@ include ':plugins:main'
+@@ -23,6 +23,7 @@ include ':plugins:main'
  include ':plugins:sensitivity'
  include ':plugins:smoothing'
  include ':plugins:source'
