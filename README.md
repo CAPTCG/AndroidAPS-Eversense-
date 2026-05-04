@@ -39,12 +39,10 @@ Before applying patches, make sure you are on the `dev` branch. In Android Studi
 Open the **Terminal** in Android Studio (bottom toolbar) and run each line in order:
 
     git am -3 C:/EversensePatches/0001-Add-Eversense-E3-365-CGM-plugin.patch
-    git am -3 C:/EversensePatches/0002-Fix-EversensePlugin-for-latest-dev-branch-migrate-to.patch
-    git am -3 C:/EversensePatches/0003-Add-EversenseStatusActivity-fix-plugin-registration-.patch
-    git am -3 C:/EversensePatches/0004-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
-    git am -3 C:/EversensePatches/0005-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
-    git am -3 C:/EversensePatches/0006-Maintenance-config-refactors-and-Eversense-related-C.patch
-
+    git am -3 C:/EversensePatches/0002-Add-EversenseStatusActivity-fix-plugin-registration-.patch
+    git am -3 C:/EversensePatches/0003-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
+    git am -3 C:/EversensePatches/0004-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
+    git am -3 C:/EversensePatches/0005-Maintenance-config-refactors-and-Eversense-related-C.patch
 ### Step 5 - Build
 
 1. **File -> Sync Project with Gradle Files**
@@ -77,5 +75,6 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
+
 
 

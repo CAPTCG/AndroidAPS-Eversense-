@@ -1,7 +1,7 @@
-From aacd5c5c642e0d1244b9a7c5225e24482a9cdd2b Mon Sep 17 00:00:00 2001
+From 3ab9f2da903f37182cf8d2266fcf4f0c3e46f1dd Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:09 -0400
-Subject: [PATCH 4/6] Register Eversense in core enums, DB models, and plugin
+Subject: [PATCH 3/5] Register Eversense in core enums, DB models, and plugin
  list
 
 - Add EVERSENSE_E3 and EVERSENSE_365 to SourceSensor enum

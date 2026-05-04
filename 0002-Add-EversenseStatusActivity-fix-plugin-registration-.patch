@@ -1,7 +1,7 @@
-From 4f0d5360ad426aee64d2dc5fdc90ca752225c8be Mon Sep 17 00:00:00 2001
+From 4e9847e7c09ad1ae8934f22c944f56f76a798dd7 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Fri, 17 Apr 2026 09:35:49 -0400
-Subject: [PATCH 3/6] Add EversenseStatusActivity, fix plugin registration, add
+Subject: [PATCH 2/5] Add EversenseStatusActivity, fix plugin registration, add
  credentials and calibration preferences
 
 Fix EversenseIntentKey: use May26 version with EversenseSignOut

@@ -1,7 +1,7 @@
-From 1cb349debdc229825e03b6ece84ffc96beac74aa Mon Sep 17 00:00:00 2001
+From 2ab6b540f0f6385746a6438677b94552d29d70e4 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:11 -0400
-Subject: [PATCH 6/6] Maintenance config refactors and Eversense-related Config
+Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
  cleanup
 
 - Fix Export Settings local: remove instance-state pendingExportFile
