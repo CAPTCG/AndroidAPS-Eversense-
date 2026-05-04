@@ -1,4 +1,4 @@
-From 515e420191196a7c53e1a4d11f16c3e83bae338e Mon Sep 17 00:00:00 2001
+From 5782bbdef63dd63a308dbd08d6d4761e74f6ccb0 Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:09 -0400
 Subject: [PATCH 3/5] Register Eversense in core enums, DB models, and plugin

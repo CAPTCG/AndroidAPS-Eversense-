@@ -1,4 +1,4 @@
-From 61c62ee6aeecec039e83b4017921bd4342cf4716 Mon Sep 17 00:00:00 2001
+From 4d4ea51e97541a895df4ca305935659bf9c48a6c Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:11 -0400
 Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
@@ -14,8 +14,9 @@ Subject: [PATCH 5/5] Maintenance config refactors and Eversense-related Config
  .../core/ui/compose/preference/PreviewUtils.kt |  2 ++
  .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
  .../app/aaps/plugins/source/EversensePlugin.kt |  8 +-------
+ .../activities/EversenseStatusActivity.kt      |  5 +++--
  .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
- 6 files changed, 26 insertions(+), 21 deletions(-)
+ 7 files changed, 29 insertions(+), 23 deletions(-)
 
 diff --git a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
 index 06cdc76dc3..357bf1c043 100644
@@ -152,6 +153,40 @@ index d5e9ebc686..7c454732cb 100644
 -
 -
 ->>>>>>> Stashed changes
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
+index 6e688c9a17..3c08e69378 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
+@@ -1,6 +1,7 @@
+ package app.aaps.plugins.source.activities
+ 
+ import android.content.Context
++import androidx.appcompat.app.AppCompatActivity
+ import android.os.Bundle
+ import android.os.Handler
+ import android.os.Looper
+@@ -9,7 +10,6 @@ import android.widget.Button
+ import android.widget.TextView
+ import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.widget.Toolbar
+-import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
+ import app.aaps.plugins.source.R
+ import com.nightscout.eversense.EversenseCGMPlugin
+ import com.nightscout.eversense.callbacks.EversenseScanCallback
+@@ -22,7 +22,7 @@ import java.text.SimpleDateFormat
+ import java.util.Date
+ import java.util.Locale
+ 
+-class EversenseStatusActivity : TranslatedDaggerAppCompatActivity() {
++class EversenseStatusActivity : AppCompatActivity() {
+ 
+     private val mainHandler = Handler(Looper.getMainLooper())
+     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+@@ -157,3 +157,4 @@ class EversenseStatusActivity : TranslatedDaggerAppCompatActivity() {
+         return super.onOptionsItemSelected(item)
+     }
+ }
++
 diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
 index 1cd5fe443b..15bfb27bc3 100644
 --- a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
