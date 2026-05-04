@@ -1,4 +1,4 @@
-From 8d439262c9ec0becfb5b02a550543a5a72c6b2c6 Mon Sep 17 00:00:00 2001
+From 1cb349debdc229825e03b6ece84ffc96beac74aa Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Mon, 4 May 2026 08:46:11 -0400
 Subject: [PATCH 6/6] Maintenance config refactors and Eversense-related Config
@@ -13,8 +13,9 @@ Subject: [PATCH 6/6] Maintenance config refactors and Eversense-related Config
  .../maintenance/ImportExportPrefs.kt           |  6 ++++--
  .../core/ui/compose/preference/PreviewUtils.kt |  2 ++
  .../maintenance/ImportExportPrefsImpl.kt       | 18 ++++++++----------
+ .../app/aaps/plugins/source/EversensePlugin.kt |  5 -----
  .../maintenance/MaintenanceViewModel.kt        | 10 +++++++++-
- 5 files changed, 25 insertions(+), 14 deletions(-)
+ 6 files changed, 25 insertions(+), 19 deletions(-)
 
 diff --git a/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt b/app/src/main/kotlin/app/aaps/implementations/ConfigImpl.kt
 index 06cdc76dc3..357bf1c043 100644
@@ -131,6 +132,22 @@ index 95e21f3197..2e7265c24b 100644
                  localSuccess = savePreferences(file, password)
                  val resultMessage = if (localSuccess) rh.gs(R.string.exported) else rh.gs(R.string.exported_failed)
                  persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
+diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+index 9787553ec2..2d036b5176 100644
+--- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
++++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
+@@ -15,11 +15,6 @@ import androidx.preference.PreferenceCategory
+ import androidx.preference.PreferenceManager
+ import androidx.preference.PreferenceScreen
+ import androidx.preference.SwitchPreference
+-import app.aaps.core.interfaces.configuration.Config
+-import app.aaps.core.interfaces.notifications.NotificationId
+-import app.aaps.core.interfaces.notifications.NotificationLevel
+-import app.aaps.core.interfaces.notifications.NotificationManager
+-import com.nightscout.eversense.models.ActiveAlarm
+ import app.aaps.core.data.model.GV
+ import app.aaps.core.data.model.SourceSensor
+ import app.aaps.core.data.model.TrendArrow
 diff --git a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt b/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt
 index 1cd5fe443b..15bfb27bc3 100644
 --- a/ui/src/main/kotlin/app/aaps/ui/compose/maintenance/MaintenanceViewModel.kt

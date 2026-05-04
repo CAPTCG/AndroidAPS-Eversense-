@@ -1,4 +1,4 @@
-From bbacbb972c61c9e90ab27b47b82abf56f0805858 Mon Sep 17 00:00:00 2001
+From 4f0d5360ad426aee64d2dc5fdc90ca752225c8be Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Fri, 17 Apr 2026 09:35:49 -0400
 Subject: [PATCH 3/6] Add EversenseStatusActivity, fix plugin registration, add
@@ -10,14 +10,14 @@ Fix strings.xml: add missing eversense_sign_out string
 ---
  .../kotlin/app/aaps/di/PluginsListModule.kt   |  8 ++-
  plugins/source/src/main/AndroidManifest.xml   |  4 +-
- .../aaps/plugins/source/EversensePlugin.kt    | 23 ++++++-
+ .../aaps/plugins/source/EversensePlugin.kt    | 11 +++-
  .../activities/EversenseStatusActivity.kt     |  6 +-
  .../aaps/plugins/source/di/SourceModule.kt    |  4 +-
  .../plugins/source/keys/EversenseIntentKey.kt | 43 +++++++++++++
  .../plugins/source/keys/EversenseStringKey.kt | 37 ++++++++++++
  .../res/layout/activity_eversense_status.xml  | 60 +++++++++++++++++++
  .../source/src/main/res/values/strings.xml    |  5 +-
- 9 files changed, 180 insertions(+), 10 deletions(-)
+ 9 files changed, 168 insertions(+), 10 deletions(-)
  create mode 100644 plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseIntentKey.kt
  create mode 100644 plugins/source/src/main/kotlin/app/aaps/plugins/source/keys/EversenseStringKey.kt
  create mode 100644 plugins/source/src/main/res/layout/activity_eversense_status.xml
@@ -62,52 +62,46 @@ index 17aa22eaea..b94d282cb0 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-index 14b5da5102..9787553ec2 100644
+index e2a8c3915d..9787553ec2 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-@@ -55,6 +55,12 @@ import kotlinx.serialization.json.Json
- import java.text.SimpleDateFormat
- import java.util.Date
- import java.util.Locale
-+import app.aaps.core.keys.interfaces.withActivity
-+import app.aaps.plugins.source.activities.EversenseStatusActivity
-+import app.aaps.plugins.source.activities.EversenseCalibrationActivity
-+import app.aaps.plugins.source.activities.EversensePlacementActivity
-+import app.aaps.plugins.source.keys.EversenseIntentKey
-+import app.aaps.plugins.source.keys.EversenseStringKey
- import app.aaps.core.keys.BooleanKey
- import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
- import javax.inject.Inject
-@@ -407,9 +413,20 @@ class EversensePlugin @Inject constructor(
-         key = "eversense_settings",
-         titleResId = R.string.source_eversense,
-         items = listOf(
-+            EversenseIntentKey.EversenseStatus.withActivity(EversenseStatusActivity::class.java),
-             BooleanKey.EversenseUseSmoothing,
-             BooleanKey.EversenseCloudUploadEnabled,
--            BooleanKey.EversenseCloudUploadToast
-+            BooleanKey.EversenseCloudUploadToast,
-+            PreferenceSubScreenDef(
-+                key = "eversense_credentials_screen",
-+                titleResId = R.string.eversense_credentials_title,
-+                items = listOf(
-+                    EversenseStringKey.EversenseUsername,
-+                    EversenseStringKey.EversensePassword
-+                )
-+            ),
-+            EversenseIntentKey.EversenseCalibration.withActivity(EversenseCalibrationActivity::class.java as Class<*>),
-+            EversenseIntentKey.EversensePlacement.withActivity(EversensePlacementActivity::class.java as Class<*>)
-         ),
-         icon = pluginDescription.icon
-     )
-@@ -686,3 +703,7 @@ class EversensePlugin @Inject constructor(
+@@ -15,14 +15,23 @@ import androidx.preference.PreferenceCategory
+ import androidx.preference.PreferenceManager
+ import androidx.preference.PreferenceScreen
+ import androidx.preference.SwitchPreference
++import app.aaps.core.interfaces.configuration.Config
++import app.aaps.core.interfaces.notifications.NotificationId
++import app.aaps.core.interfaces.notifications.NotificationLevel
++import app.aaps.core.interfaces.notifications.NotificationManager
++import com.nightscout.eversense.models.ActiveAlarm
+ import app.aaps.core.data.model.GV
+ import app.aaps.core.data.model.SourceSensor
+ import app.aaps.core.data.model.TrendArrow
+ import app.aaps.core.data.plugin.PluginType
+ import app.aaps.core.data.ue.Sources
++import app.aaps.core.interfaces.configuration.Config
+ import app.aaps.core.interfaces.db.PersistenceLayer
+ import app.aaps.core.interfaces.logging.AAPSLogger
+ import app.aaps.core.interfaces.logging.LTag
++import app.aaps.core.interfaces.notifications.NotificationId
++import app.aaps.core.interfaces.notifications.NotificationLevel
++import app.aaps.core.interfaces.notifications.NotificationManager
+ import app.aaps.core.interfaces.plugin.PluginDescription
+ import app.aaps.core.interfaces.resources.ResourceHelper
+ import app.aaps.core.interfaces.source.BgSource
+@@ -32,6 +41,7 @@ import com.nightscout.eversense.callbacks.EversenseScanCallback
+ import com.nightscout.eversense.callbacks.EversenseWatcher
+ import com.nightscout.eversense.enums.CalibrationReadiness
+ import com.nightscout.eversense.enums.EversenseType
++import com.nightscout.eversense.models.ActiveAlarm
+ import com.nightscout.eversense.models.EversenseCGMResult
+ import com.nightscout.eversense.models.EversenseScanResult
+ import com.nightscout.eversense.models.EversenseSecureState
+@@ -697,4 +707,3 @@ class EversensePlugin @Inject constructor(
  
  
  
-+
-+
-+
-+
+-
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt
 index 72b013457b..6e688c9a17 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/activities/EversenseStatusActivity.kt

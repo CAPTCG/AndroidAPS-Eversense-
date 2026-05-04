@@ -1,16 +1,17 @@
-From 13290927005533a1e66ff61ba22820cc65b2107c Mon Sep 17 00:00:00 2001
+From f82ca4abfeec60810a7a370de18b17475228c60e Mon Sep 17 00:00:00 2001
 From: Craig Gordon <craighvac@gmail.com>
 Date: Thu, 16 Apr 2026 15:55:13 -0400
 Subject: [PATCH 2/6] Fix EversensePlugin for latest dev branch - migrate to
  Compose preferences API
 
+Fix EversensePlugin: remove duplicate imports
 ---
  .../kotlin/app/aaps/core/keys/BooleanKey.kt   |   4 +
  core/keys/src/main/res/values/strings.xml     |   4 +
  plugins/source/build.gradle.kts               |   3 +-
- .../aaps/plugins/source/EversensePlugin.kt    | 473 ++++++++++++------
+ .../aaps/plugins/source/EversensePlugin.kt    | 451 ++++++++++++------
  .../source/src/main/res/values/strings.xml    |   2 +
- 5 files changed, 328 insertions(+), 158 deletions(-)
+ 5 files changed, 323 insertions(+), 141 deletions(-)
 
 diff --git a/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt b/core/keys/src/main/kotlin/app/aaps/core/keys/BooleanKey.kt
 index ca8fab8199..7a32ec97e8 100644
@@ -64,7 +65,7 @@ index 46176f7ad4..ed9973114c 100644
 \ No newline at end of file
 +}
 diff --git a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
-index e84cd6f721..14b5da5102 100644
+index e84cd6f721..e2a8c3915d 100644
 --- a/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
 +++ b/plugins/source/src/main/kotlin/app/aaps/plugins/source/EversensePlugin.kt
 @@ -1,4 +1,4 @@
@@ -73,30 +74,25 @@ index e84cd6f721..14b5da5102 100644
  
  import android.Manifest
  import android.content.Intent
-@@ -9,6 +9,12 @@ import android.os.Looper
+@@ -9,11 +9,12 @@ import android.os.Looper
  import androidx.appcompat.app.AlertDialog
  import androidx.core.content.ContextCompat
  import androidx.core.content.edit
+-import app.aaps.core.interfaces.configuration.Config
+-import app.aaps.core.interfaces.notifications.NotificationId
+-import app.aaps.core.interfaces.notifications.NotificationLevel
+-import app.aaps.core.interfaces.notifications.NotificationManager
+-import com.nightscout.eversense.models.ActiveAlarm
 +import androidx.preference.EditTextPreference
 +import androidx.preference.Preference
 +import androidx.preference.PreferenceCategory
 +import androidx.preference.PreferenceManager
 +import androidx.preference.PreferenceScreen
 +import androidx.preference.SwitchPreference
- import app.aaps.core.interfaces.configuration.Config
- import app.aaps.core.interfaces.notifications.NotificationId
- import app.aaps.core.interfaces.notifications.NotificationLevel
-@@ -19,21 +25,23 @@ import app.aaps.core.data.model.SourceSensor
+ import app.aaps.core.data.model.GV
+ import app.aaps.core.data.model.SourceSensor
  import app.aaps.core.data.model.TrendArrow
- import app.aaps.core.data.plugin.PluginType
- import app.aaps.core.data.ue.Sources
-+import app.aaps.core.interfaces.configuration.Config
- import app.aaps.core.interfaces.db.PersistenceLayer
- import app.aaps.core.interfaces.logging.AAPSLogger
- import app.aaps.core.interfaces.logging.LTag
-+import app.aaps.core.interfaces.notifications.NotificationId
-+import app.aaps.core.interfaces.notifications.NotificationLevel
-+import app.aaps.core.interfaces.notifications.NotificationManager
+@@ -25,14 +26,11 @@ import app.aaps.core.interfaces.logging.LTag
  import app.aaps.core.interfaces.plugin.PluginDescription
  import app.aaps.core.interfaces.resources.ResourceHelper
  import app.aaps.core.interfaces.source.BgSource
@@ -109,21 +105,18 @@ index e84cd6f721..14b5da5102 100644
  import com.nightscout.eversense.enums.CalibrationReadiness
 -import com.nightscout.eversense.enums.EversenseAlarm
  import com.nightscout.eversense.enums.EversenseType
-+import com.nightscout.eversense.models.ActiveAlarm
  import com.nightscout.eversense.models.EversenseCGMResult
  import com.nightscout.eversense.models.EversenseScanResult
- import com.nightscout.eversense.models.EversenseSecureState
-@@ -47,18 +55,12 @@ import kotlinx.serialization.json.Json
- import java.text.SimpleDateFormat
+@@ -48,17 +46,17 @@ import java.text.SimpleDateFormat
  import java.util.Date
  import java.util.Locale
--import app.aaps.core.keys.interfaces.withActivity
+ import app.aaps.core.keys.interfaces.withActivity
 -import app.aaps.core.keys.interfaces.withClick
--import app.aaps.plugins.source.activities.EversenseStatusActivity
--import app.aaps.plugins.source.activities.EversenseCalibrationActivity
--import app.aaps.plugins.source.activities.EversensePlacementActivity
--import app.aaps.plugins.source.keys.EversenseIntentKey
--import app.aaps.plugins.source.keys.EversenseStringKey
+ import app.aaps.plugins.source.activities.EversenseStatusActivity
+ import app.aaps.plugins.source.activities.EversenseCalibrationActivity
+ import app.aaps.plugins.source.activities.EversensePlacementActivity
+ import app.aaps.plugins.source.keys.EversenseIntentKey
+ import app.aaps.plugins.source.keys.EversenseStringKey
 -import app.aaps.core.ui.compose.icons.IcPluginEversense
  import app.aaps.core.keys.BooleanKey
  import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
@@ -134,7 +127,7 @@ index e84cd6f721..14b5da5102 100644
  class EversensePlugin @Inject constructor(
      rh: ResourceHelper,
      private val context: Context,
-@@ -69,12 +71,7 @@ class EversensePlugin @Inject constructor(
+@@ -69,12 +67,7 @@ class EversensePlugin @Inject constructor(
  ) : AbstractBgSourcePlugin(
      PluginDescription()
          .mainType(PluginType.BGSOURCE)
@@ -148,7 +141,7 @@ index e84cd6f721..14b5da5102 100644
          .pluginName(R.string.source_eversense)
          .preferencesVisibleInSimpleMode(false)
          .description(R.string.description_source_eversense),
-@@ -83,17 +80,18 @@ class EversensePlugin @Inject constructor(
+@@ -83,17 +76,18 @@ class EversensePlugin @Inject constructor(
  ), BgSource, EversenseWatcher {
  
      @Inject lateinit var persistenceLayer: PersistenceLayer
@@ -171,7 +164,7 @@ index e84cd6f721..14b5da5102 100644
  
      private fun cloudUploadEnabled() = preferences.get(BooleanKey.EversenseCloudUploadEnabled)
      private fun cloudUploadToastEnabled() = preferences.get(BooleanKey.EversenseCloudUploadToast)
-@@ -117,13 +115,14 @@ class EversensePlugin @Inject constructor(
+@@ -117,13 +111,14 @@ class EversensePlugin @Inject constructor(
      private var releaseForOfficialApp: Boolean = false
      @Volatile private var placementNotificationSnoozed: Boolean = false
  
@@ -189,7 +182,7 @@ index e84cd6f721..14b5da5102 100644
          if (hasBluetoothPermissions()) {
              aapsLogger.debug(LTag.BGSOURCE, "onStart — permissions granted, attempting auto-reconnect")
              ioScope.launch {
-@@ -140,57 +139,277 @@ class EversensePlugin @Inject constructor(
+@@ -140,32 +135,270 @@ class EversensePlugin @Inject constructor(
          eversense.removeWatcher(this)
      }
  
@@ -249,7 +242,7 @@ index e84cd6f721..14b5da5102 100644
 +            else rh.gs(R.string.eversense_credentials_not_set)
 +            aapsLogger.info(LTag.BGSOURCE, "Eversense password updated")
 +            true
-         }
++        }
 +
 +        val signOut = Preference(context)
 +        signOut.key = "eversense_credentials_sign_out"
@@ -309,7 +302,7 @@ index e84cd6f721..14b5da5102 100644
 +                    .show()
 +            }
 +            true
-+        }
+         }
 +
 +        val informationCategory = PreferenceCategory(context)
 +        informationCategory.title = rh.gs(R.string.eversense_information_title)
@@ -474,18 +467,18 @@ index e84cd6f721..14b5da5102 100644
      override fun getPreferenceScreenContent() = PreferenceSubScreenDef(
          key = "eversense_settings",
          titleResId = R.string.source_eversense,
-         items = listOf(
--            EversenseIntentKey.EversenseStatus.withActivity(EversenseStatusActivity::class.java),
+@@ -173,6 +406,7 @@ class EversensePlugin @Inject constructor(
+             EversenseIntentKey.EversenseStatus.withActivity(EversenseStatusActivity::class.java),
              BooleanKey.EversenseUseSmoothing,
              BooleanKey.EversenseCloudUploadEnabled,
--            PreferenceSubScreenDef(
--                key = "eversense_credentials_screen",
--                titleResId = R.string.eversense_credentials_title,
--                items = listOf(
--                    EversenseStringKey.EversenseUsername,
--                    EversenseStringKey.EversensePassword
--                )
--            ),
++            BooleanKey.EversenseCloudUploadToast,
+             PreferenceSubScreenDef(
+                 key = "eversense_credentials_screen",
+                 titleResId = R.string.eversense_credentials_title,
+@@ -181,14 +415,6 @@ class EversensePlugin @Inject constructor(
+                     EversenseStringKey.EversensePassword
+                 )
+             ),
 -            EversenseIntentKey.EversenseSignOut.withClick {
 -                val cleared = getSecureState().also {
 -                    it.username = ""
@@ -494,13 +487,10 @@ index e84cd6f721..14b5da5102 100644
 -                saveSecureState(cleared)
 -                aapsLogger.info(LTag.BGSOURCE, "Eversense credentials cleared by user")
 -            },
--            EversenseIntentKey.EversenseCalibration.withActivity(EversenseCalibrationActivity::class.java as Class<*>),
--            EversenseIntentKey.EversensePlacement.withActivity(EversensePlacementActivity::class.java as Class<*>)
-+            BooleanKey.EversenseCloudUploadToast
+             EversenseIntentKey.EversenseCalibration.withActivity(EversenseCalibrationActivity::class.java as Class<*>),
+             EversenseIntentKey.EversensePlacement.withActivity(EversensePlacementActivity::class.java as Class<*>)
          ),
-         icon = pluginDescription.icon
-     )
-@@ -228,9 +447,6 @@ class EversensePlugin @Inject constructor(
+@@ -228,9 +454,6 @@ class EversensePlugin @Inject constructor(
      override fun onStateChanged(state: EversenseState) {
          aapsLogger.info(LTag.BGSOURCE, "New state received: ${Json.encodeToString(state)}")
  
@@ -510,7 +500,7 @@ index e84cd6f721..14b5da5102 100644
          // Sync SAGE color thresholds to match Eversense sensor lifetime and notification days
          if (state.insertionDate > 0) {
              val lifetimeDays = if (eversense.is365()) 365 else 180
-@@ -298,8 +514,9 @@ class EversensePlugin @Inject constructor(
+@@ -298,8 +521,9 @@ class EversensePlugin @Inject constructor(
              )
          }
  
@@ -522,7 +512,7 @@ index e84cd6f721..14b5da5102 100644
              && System.currentTimeMillis() >= state.nextCalibrationDate
              && !isCalibrationDueDismissed(state.nextCalibrationDate)) {
              setCalibrationDueDismissed(state.nextCalibrationDate)
-@@ -326,34 +543,49 @@ class EversensePlugin @Inject constructor(
+@@ -326,34 +550,49 @@ class EversensePlugin @Inject constructor(
          aapsLogger.warn(LTag.BGSOURCE, "Transmitter not placed — firing placement warning notification")
          mainHandler.post {
              notificationManager.post(
@@ -587,7 +577,7 @@ index e84cd6f721..14b5da5102 100644
          val level = when {
              alarm.code.isCritical -> NotificationLevel.URGENT
              alarm.code.isWarning  -> NotificationLevel.NORMAL
-@@ -361,8 +593,8 @@ class EversensePlugin @Inject constructor(
+@@ -361,8 +600,8 @@ class EversensePlugin @Inject constructor(
          }
          mainHandler.post {
              notificationManager.post(
@@ -598,7 +588,7 @@ index e84cd6f721..14b5da5102 100644
                  level = level
              )
          }
-@@ -382,78 +614,13 @@ class EversensePlugin @Inject constructor(
+@@ -382,78 +621,13 @@ class EversensePlugin @Inject constructor(
                  }
              )
          }
@@ -681,15 +671,10 @@ index e84cd6f721..14b5da5102 100644
  
      private fun showDeviceSelectionDialog(context: Context) {
          val foundDevices = mutableListOf<EversenseScanResult>()
-@@ -519,11 +686,3 @@ class EversensePlugin @Inject constructor(
+@@ -524,6 +698,3 @@ class EversensePlugin @Inject constructor(
  
  
  
--
--
--
--
--
 -
 -
 -
