@@ -20,7 +20,7 @@ Developed by [n0rb33r7](https://github.com/n0rb33r7), [bastiaanv](https://github
 
 Click the green **Code** button on this page and select **Download ZIP**.
 
-Extract the ZIP somewhere on your computer, e.g. `C:\EversensePatches`
+Extract the ZIP somewhere on your computer. The patches will be inside a subfolder e.g. `C:\EversensePatches\AndroidAPS-Eversense--master\`
 
 ### Step 2 - Switch to the dev branch
 
@@ -43,6 +43,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
     git am -3 C:/EversensePatches/0003-Register-Eversense-in-core-enums-DB-models-and-plugi.patch
     git am -3 C:/EversensePatches/0004-UI-Eversense-customizations-TIR-rename-transmitter-b.patch
     git am -3 C:/EversensePatches/0005-Maintenance-config-refactors-and-Eversense-related-C.patch
+
 ### Step 5 - Build
 
 1. **File -> Sync Project with Gradle Files**
@@ -75,6 +76,7 @@ Open the **Terminal** in Android Studio (bottom toolbar) and run each line in or
 ## Related
 
 - Original PR: [nightscout/AndroidAPS #4474](https://github.com/nightscout/AndroidAPS/pull/4474)
+
 
 
 
