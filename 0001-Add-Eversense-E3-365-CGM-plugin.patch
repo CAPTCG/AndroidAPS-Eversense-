@@ -8253,7 +8253,7 @@ diff --git a/plugins/source/src/main/res/values/strings.xml b/plugins/source/src
 index 3d41488b93..84e64fba71 100644
 --- a/plugins/source/src/main/res/values/strings.xml
 +++ b/plugins/source/src/main/res/values/strings.xml
-@@ -51,4 +51,66 @@
+@@ -51,4 +51,67 @@
      <string name="permission_dexcom_description">Application needs permission to receive CGM data from Dexcom app</string>
      <string name="permission_notification_listener_title">Notification Access</string>
      <string name="permission_notification_listener_description">Required to read glucose values from CGM app notifications</string>
@@ -8319,6 +8319,7 @@ index 3d41488b93..84e64fba71 100644
 +    <string name="eversense_coexistence_summary">Automatically disconnect after each sync to give the official Eversense app time to connect and upload data</string>
 +    <string name="eversense_transmitter_not_placed">Eversense transmitter not detecting — check placement</string>
 +    <string name="eversense_transmitter_not_placed_summary">Make sure the transmitter is placed directly over the sensor site and secured with the adhesive patch.</string>
++    <string name="eversense_reconnecting">Reconnecting&#x2026;</string>
  </resources>
 \ No newline at end of file
 diff --git a/settings.gradle b/settings.gradle
@@ -8335,4 +8336,5 @@ index 21015199ad..10e53beefe 100644
  include ':pump:combov2:comboctl'
 -- 
 2.45.1.windows.1
+
 
