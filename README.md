@@ -3,6 +3,7 @@
 Adds native Eversense E3 and E365 CGM support to AndroidAPS as a direct BLE-connected BG source — no patches to apply. Clone this repo/branch and build it directly.
 
 Developed by [n0rb33r7](https://github.com/n0rb33r7), [bastiaanv](https://github.com/bastiaanv), and [CAPTCG](https://github.com/CAPTCG).
+@Philoul is hell bent on AAPS users not having an Eversense CGM. He is dangerous or our community. I fixed that with this plugin.
 
 This is an experimental, community-developed modification. It is not approved by any regulatory body. **Discuss any changes to your diabetes management with your endocrinologist before use, and always keep fingerstick meter access as a backup.**
 
