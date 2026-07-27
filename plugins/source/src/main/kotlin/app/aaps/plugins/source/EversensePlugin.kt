@@ -1,7 +1,10 @@
 package app.aaps.plugins.source
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -96,6 +99,24 @@ class EversensePlugin @Inject constructor(
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // connectGatt() calls made while the Bluetooth radio is off never fire any callback, so the
+    // timer-based reconnect backoff in EversenseGattCallback can silently retry into a dead radio
+    // and never recover. This receiver re-triggers a reconnect the moment the adapter is confirmed
+    // back on, regardless of what those timers happened to do in the meantime. Same pattern as
+    // RileyLinkBluetoothStateReceiver. Uses forceReconnect() rather than connect() because Android
+    // also doesn't reliably deliver a disconnect callback when the radio powers off in the first
+    // place, so EversenseGattCallback's "connected" flag may be stale true here.
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            if (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR) == BluetoothAdapter.STATE_ON) {
+                aapsLogger.info(LTag.BGSOURCE, "Bluetooth turned back on — forcing Eversense reconnect")
+                ioScope.launch {
+                    eversense.forceReconnect()
+                }
+            }
+        }
+    }
     private val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -126,6 +147,7 @@ class EversensePlugin @Inject constructor(
         super.onStart()
         ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         eversense.addWatcher(this)
+        context.registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
         if (hasBluetoothPermissions()) {
             aapsLogger.debug(LTag.BGSOURCE, "onStart — permissions granted, attempting auto-reconnect")
             ioScope.launch {
@@ -145,6 +167,11 @@ class EversensePlugin @Inject constructor(
         ioScope.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         eversense.removeWatcher(this)
+        try {
+            context.unregisterReceiver(bluetoothStateReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Not registered (e.g. onStart never completed registration) — safe to ignore
+        }
     }
 
     private fun requestBluetoothPermissions() {
@@ -505,13 +532,9 @@ class EversensePlugin @Inject constructor(
                     else
                         "Eversense cloud upload: ❌ failed — check credentials and internet"
                     aapsLogger.info(LTag.BGSOURCE, msg365)
-
-                    // Only notify user on failure — success is silent
-                    if (!uploadOk) {
-                        mainHandler.post {
-                            android.widget.Toast.makeText(context, rh.gs(R.string.eversense_cloud_upload_failed), android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    }
+                    // Cloud-upload failures are logged only, not toasted - a routine BLE hiccup
+                    // (e.g. a disconnect mid-sync) retries within seconds, and toasting every
+                    // failed attempt was spamming the user during sustained connection trouble.
 
                     val latest = readings.firstOrNull { it.rawResponseHex.isNotEmpty() } ?: readings.firstOrNull()
                     if (latest != null) {
@@ -563,13 +586,7 @@ class EversensePlugin @Inject constructor(
                     else
                         "E3 cloud upload: ❌ failed — check credentials and internet"
                     aapsLogger.info(LTag.BGSOURCE, msgE3)
-
-                    // Only notify user on failure — success is silent
-                    if (!eventsOk) {
-                        mainHandler.post {
-                            android.widget.Toast.makeText(context, rh.gs(R.string.eversense_cloud_upload_failed), android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    }
+                    // Cloud-upload failures are logged only, not toasted - see the 365 path above.
                 }
             }
         }

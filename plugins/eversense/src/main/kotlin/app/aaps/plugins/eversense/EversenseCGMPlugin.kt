@@ -98,6 +98,19 @@ class EversenseCGMPlugin(
         } ?: EversenseLogger.info(TAG, "stopScan called but no active scan found")
     }
 
+    // Android doesn't always deliver onConnectionStateChange when the Bluetooth radio itself
+    // is powered off (observed in the wild: no disconnect callback at all across a BT toggle),
+    // so gattCallback's internal "connected" flag can be left stale true. A live BLE connection
+    // cannot survive the whole adapter going off, so plain connect() would wrongly short-circuit
+    // on isConnected() and do nothing. Call this instead of connect() when reacting to
+    // BluetoothAdapter.ACTION_STATE_CHANGED -> STATE_ON, since that's exactly the situation where
+    // "connected" may be lying.
+    @SuppressLint("MissingPermission")
+    fun forceReconnect(): Boolean {
+        gattCallback.cleanUp()
+        return connect(null)
+    }
+
     @SuppressLint("MissingPermission")
     fun connect(device: BluetoothDevice? = null): Boolean {
         stopScan()
@@ -106,6 +119,16 @@ class EversenseCGMPlugin(
             if (gattCallback.isConnected()) {
                 EversenseLogger.info(TAG, "Already connected, skipping reconnect")
                 return true
+            }
+
+            if (bluetoothManager.adapter?.isEnabled != true) {
+                // connectGatt() made while the Bluetooth radio is off (or still mid-toggle)
+                // never fires any callback - not even a failure one - so it must not be
+                // attempted here. Retrying blindly on a timer against a dead radio just wastes
+                // GATT client slots. EversensePlugin's BluetoothAdapter.ACTION_STATE_CHANGED
+                // receiver calls connect() again the moment the adapter is confirmed back on.
+                EversenseLogger.warning(TAG, "Bluetooth is disabled — skipping connect attempt, will retry once it's back on")
+                return false
             }
 
             gattCallback.cleanUp()
@@ -152,21 +175,26 @@ class EversenseCGMPlugin(
             return
         }
         try {
-            if (gattCallback.is365()) {
-                if (isEnabled) {
-                    gattCallback.writePacket<EnterDiagnosticMode365Packet.Response>(EnterDiagnosticMode365Packet())
+            // Routed through bleExecutor (like every other write path) so this can't race a
+            // concurrently in-flight write from the Keep Alive sync cycle.
+            val future = gattCallback.submitToExecutor {
+                if (gattCallback.is365()) {
+                    if (isEnabled) {
+                        gattCallback.writePacket<EnterDiagnosticMode365Packet.Response>(EnterDiagnosticMode365Packet())
+                    } else {
+                        gattCallback.writePacket<ExitDiagnosticMode365Packet.Response>(ExitDiagnosticMode365Packet())
+                    }
+                    EversenseLogger.info(TAG, "Diagnostic mode set to $isEnabled (365)")
                 } else {
-                    gattCallback.writePacket<ExitDiagnosticMode365Packet.Response>(ExitDiagnosticMode365Packet())
+                    if (isEnabled) {
+                        gattCallback.writePacket<EnterDiagnosticModePacket.Response>(EnterDiagnosticModePacket())
+                    } else {
+                        gattCallback.writePacket<ExitDiagnosticModePacket.Response>(ExitDiagnosticModePacket())
+                    }
+                    EversenseLogger.info(TAG, "Diagnostic mode set to $isEnabled (E3)")
                 }
-                EversenseLogger.info(TAG, "Diagnostic mode set to $isEnabled (365)")
-            } else {
-                if (isEnabled) {
-                    gattCallback.writePacket<EnterDiagnosticModePacket.Response>(EnterDiagnosticModePacket())
-                } else {
-                    gattCallback.writePacket<ExitDiagnosticModePacket.Response>(ExitDiagnosticModePacket())
-                }
-                EversenseLogger.info(TAG, "Diagnostic mode set to $isEnabled (E3)")
             }
+            future.get(20000, java.util.concurrent.TimeUnit.MILLISECONDS)
         } catch (e: Exception) {
             EversenseLogger.warning(TAG, "setDiagnosticMode failed: $e")
         }
@@ -292,14 +320,19 @@ class EversenseCGMPlugin(
     fun readSignalStrength() {
         if (!gattCallback.isConnected()) { EversenseLogger.warning(TAG, "Cannot read signal strength — not connected"); return }
         try {
-            val signalStrength = if (gattCallback.is365()) {
-                val response = gattCallback.writePacket<GetSignalStrengthPacket.Response>(GetSignalStrengthPacket())
-                response.signalStrength
-            } else {
-                val response = gattCallback.writePacket<GetSignalStrengthRawPacket.Response>(GetSignalStrengthRawPacket())
-                EversenseLogger.info(TAG, "E3 signal raw: ${response.rawValue} -> ${response.signalStrength}%")
-                response.signalStrength
+            // Routed through bleExecutor (like every other write path) so this can't race a
+            // concurrently in-flight write from the Keep Alive sync cycle.
+            val future = gattCallback.submitToExecutor {
+                if (gattCallback.is365()) {
+                    val response = gattCallback.writePacket<GetSignalStrengthPacket.Response>(GetSignalStrengthPacket())
+                    response.signalStrength
+                } else {
+                    val response = gattCallback.writePacket<GetSignalStrengthRawPacket.Response>(GetSignalStrengthRawPacket())
+                    EversenseLogger.info(TAG, "E3 signal raw: ${response.rawValue} -> ${response.signalStrength}%")
+                    response.signalStrength
+                }
             }
+            val signalStrength = future.get(20000, java.util.concurrent.TimeUnit.MILLISECONDS)
             val stateJson = preferences.getString(StorageKeys.STATE, null) ?: "{}"
             val state = JSON.decodeFromString<EversenseState>(stateJson)
             state.sensorSignalStrength = signalStrength
