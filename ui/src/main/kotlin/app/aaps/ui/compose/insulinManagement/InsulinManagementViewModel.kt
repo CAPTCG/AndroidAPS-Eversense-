@@ -347,7 +347,7 @@ class InsulinManagementViewModel @Inject constructor(
         // Inhaled insulins (e.g. Afrezza) are only recognised by fromPeak() at their exact
         // factory-default peak (15 min for Afrezza). Re-deriving the template on every edit would
         // drop out of the inhaled identity the moment the value moves even 1 minute within its own
-        // valid 10-20 range, silently reverting isInhaled to false and, with it, the inhaled-specific
+        // valid 10-30 range, silently reverting isInhaled to false and, with it, the inhaled-specific
         // peak/DIA hard limits and the auto-generated nickname. Once editing an inhaled template,
         // keep that identity - only non-inhaled templates re-derive from peak (this preserves the
         // existing "drag peak to switch between Novorapid/Fiasp/Lyumjev" auto-naming behavior).
@@ -432,17 +432,14 @@ class InsulinManagementViewModel @Inject constructor(
         editedICfg.setDia(state.editorDiaHours)
         editedICfg.setPeak(state.editorPeakMinutes)
 
-        // Validation
-        val isInhaled = _uiState.value.editorTemplate?.isInhaled == true
-        val minDia = if (isInhaled) hardLimits.minDiaInhaled() else hardLimits.minDia()
-        val maxDia = if (isInhaled) hardLimits.maxDiaInhaled() else hardLimits.maxDia()
-        if (editedICfg.dia < minDia || editedICfg.dia > maxDia) {
+        // Validation. Inhaled insulin (e.g. Afrezza) is checked against its own, much narrower
+        // ranges - see HardLimits.LIMIT_DIA_INHALED / LIMIT_PEAK_INHALED.
+        val isInhaled = state.editorTemplate?.isInhaled == true
+        if (editedICfg.dia !in (if (isInhaled) hardLimits.diaInhaledRange() else hardLimits.diaRange())) {
             showSnackbar(rh.gs(CoreUiR.string.value_out_of_hard_limits, rh.gs(CoreUiR.string.insulin_dia), editedICfg.dia))
             return false
         }
-        val minPeak = if (isInhaled) hardLimits.minPeakInhaled() else hardLimits.minPeak()
-        val maxPeak = if (isInhaled) hardLimits.maxPeakInhaled() else hardLimits.maxPeak()
-        if (editedICfg.peak < minPeak || editedICfg.peak > maxPeak) {
+        if (editedICfg.peak !in (if (isInhaled) hardLimits.peakInhaledRange() else hardLimits.peakRange())) {
             showSnackbar(rh.gs(CoreUiR.string.value_out_of_hard_limits, rh.gs(CoreUiR.string.insulin_peak), editedICfg.peak.toDouble()))
             return false
         }
@@ -581,14 +578,15 @@ class InsulinManagementViewModel @Inject constructor(
     val concentrationEnabled: Boolean
         get() = preferences.get(BooleanKey.GeneralInsulinConcentration)
 
-    fun diaRange(): ClosedFloatingPointRange<Double> {
-        val isInhaled = _uiState.value.editorTemplate?.isInhaled == true
-        return if (isInhaled) hardLimits.minDiaInhaled()..hardLimits.maxDiaInhaled()
-        else hardLimits.minDia()..hardLimits.maxDia()
-    }
-    fun peakRange(): ClosedFloatingPointRange<Double> {
-        val isInhaled = _uiState.value.editorTemplate?.isInhaled == true
-        return if (isInhaled) hardLimits.minPeakInhaled().toDouble()..hardLimits.maxPeakInhaled().toDouble()
-        else hardLimits.minPeak().toDouble()..hardLimits.maxPeak().toDouble()
-    }
+    /** Slider limits for the template being edited. Inhaled insulin (e.g. Afrezza) uses its own
+     *  ranges, so the slider cannot be dragged outside what validation would then reject. */
+    private val editorIsInhaled: Boolean get() = _uiState.value.editorTemplate?.isInhaled == true
+
+    fun diaRange(): ClosedFloatingPointRange<Double> =
+        if (editorIsInhaled) hardLimits.diaInhaledRange() else hardLimits.diaRange()
+
+    /** Peak limits as a Double range, because the sliders work with Double. */
+    fun peakRange(): ClosedFloatingPointRange<Double> =
+        (if (editorIsInhaled) hardLimits.peakInhaledRange() else hardLimits.peakRange())
+            .let { it.first.toDouble()..it.last.toDouble() }
 }

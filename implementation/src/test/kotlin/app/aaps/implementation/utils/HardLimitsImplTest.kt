@@ -136,52 +136,50 @@ class HardLimitsImplTest : TestBase() {
     }
 
     @Test
-    fun `minDia returns correct values for all ages`() {
+    fun `diaRange returns correct values for all ages`() {
+        // This fork keeps the upper bound at 10.0 for every age type - upstream lowered it to 9.0
+        // for all but PREGNANT. See HardLimits.LIMIT_DIA.
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
-        assertThat(hardLimits.minDia()).isEqualTo(5.0)
+        assertThat(hardLimits.diaRange()).isEqualTo(5.0..10.0)
 
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
-        assertThat(hardLimits.minDia()).isEqualTo(5.0)
+        assertThat(hardLimits.diaRange()).isEqualTo(5.0..10.0)
     }
 
     @Test
-    fun `maxDia returns correct values for all ages`() {
+    fun `diaInhaledRange and peakInhaledRange use the inhaled limits`() {
+        // Inhaled insulin (e.g. Afrezza) has its own, much narrower limits, and they are the same
+        // for every age type - see HardLimits.LIMIT_DIA_INHALED / LIMIT_PEAK_INHALED.
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
-        assertThat(hardLimits.maxDia()).isEqualTo(10.0)
+        assertThat(hardLimits.diaInhaledRange()).isEqualTo(1.0..3.0)
+        assertThat(hardLimits.peakInhaledRange()).isEqualTo(10..30)
 
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
-        assertThat(hardLimits.maxDia()).isEqualTo(10.0)
+        assertThat(hardLimits.diaInhaledRange()).isEqualTo(1.0..3.0)
+        assertThat(hardLimits.peakInhaledRange()).isEqualTo(10..30)
     }
 
     @Test
-    fun `minIC returns correct values for all ages`() {
+    fun `icRange returns correct values for all ages`() {
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
-        assertThat(hardLimits.minIC()).isEqualTo(2.0)
+        assertThat(hardLimits.icRange()).isEqualTo(2.0..100.0)
 
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
-        assertThat(hardLimits.minIC()).isEqualTo(0.3)
+        assertThat(hardLimits.icRange()).isEqualTo(0.3..100.0)
     }
 
     @Test
-    fun `maxIC returns correct values for all ages`() {
-        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
-        assertThat(hardLimits.maxIC()).isEqualTo(100.0)
-
-        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
-        assertThat(hardLimits.maxIC()).isEqualTo(100.0)
+    fun `an unknown age falls back to adult`() {
+        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("nonsense")
+        assertThat(hardLimits.maxBolus()).isEqualTo(HardLimits.MAX_BOLUS.getValue(HardLimits.AgeType.ADULT))
+        assertThat(hardLimits.diaRange()).isEqualTo(HardLimits.LIMIT_DIA.getValue(HardLimits.AgeType.ADULT))
     }
 
     @Test
-    fun `isInRange returns true when value is within range`() {
-        assertThat(hardLimits.isInRange(5.0, 0.0, 10.0)).isTrue()
-        assertThat(hardLimits.isInRange(0.0, 0.0, 10.0)).isTrue()
-        assertThat(hardLimits.isInRange(10.0, 0.0, 10.0)).isTrue()
-    }
-
-    @Test
-    fun `isInRange returns false when value is outside range`() {
-        assertThat(hardLimits.isInRange(-0.1, 0.0, 10.0)).isFalse()
-        assertThat(hardLimits.isInRange(10.1, 0.0, 10.0)).isFalse()
+    fun `verifyHardLimits with a range clamps the same way as with two bounds`() {
+        assertThat(hardLimits.verifyHardLimits(5.0, app.aaps.core.ui.R.string.bolus, 0.0..10.0)).isEqualTo(5.0)
+        assertThat(hardLimits.verifyHardLimits(-5.0, app.aaps.core.ui.R.string.bolus, 0.0..10.0)).isEqualTo(0.0)
+        assertThat(hardLimits.verifyHardLimits(15.0, app.aaps.core.ui.R.string.bolus, 0.0..10.0)).isEqualTo(10.0)
     }
 
     @Test
