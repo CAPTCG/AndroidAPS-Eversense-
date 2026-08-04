@@ -14,15 +14,16 @@ import org.mockito.kotlin.mock
 import java.nio.ByteBuffer
 
 /**
- * [Session.validateSequenceNumber] - the O5-only response-envelope sequence check (see
- * [Session.parseResponse]'s doc comment for why the envelope's trailing CRC is
- * deliberately *not* enforced alongside it).
+ * [Session.validateSequenceNumber] - the O5-only response-envelope sequence check that runs
+ * alongside `Session.validateCrc` (covered separately in [SessionResponseCrcTest]).
  *
  * The rule under test is that a pod's response carries the request's sequence number **plus
- * one**, which is pinned below against real Omnipod 5 request/response pairs captured from a
- * working Loop/Trio installation's Device Communication Log. An earlier revision compared
- * against the request's own sequence number and would have rejected every response a real
- * pod ever sent.
+ * one**, which is pinned below against real request/response pairs captured from a working
+ * Loop/Trio installation's Device Communication Log. An earlier revision compared against the
+ * request's own sequence number and would have rejected every response a real pod ever sent.
+ *
+ * Note these particular pairs are **Dash** traffic (`podTypeValue: 4` in the source report) -
+ * the sequence rule is identical on both pod generations, unlike the CRC.
  */
 class SessionResponseValidationTest {
 

@@ -134,36 +134,68 @@ class Session(
         // uniqueId is still not validated - matches OmnipodKit's own PodCommsSession.swift,
         // which declares PodCommsError.invalidAddress but never actually throws it either.
         //
-        // The trailing CRC is deliberately NOT enforced, only logged. An earlier revision of
-        // this method did enforce it (on research claiming OmnipodKit checks it for O5), but
-        // real Omnipod 5 traffic disproves that: of 400 pod responses captured from a working
-        // Loop/Trio installation's Device Communication Log, 389 fail this CRC while all
-        // captured *outgoing* messages match it exactly. OmnipodKit's own source comment says
-        // the pod-generated CRC's "algorithm is not understood" - that evidently applies to O5
-        // as well, not just Dash. Enforcing it would reject essentially every response.
-        //
-        // The embedded command sequence number IS validated, O5-only (commandSigner != null -
-        // see this class's constructor doc), because that one is confirmed correct - see
-        // [validateSequenceNumber].
+        // The trailing CRC and the embedded command sequence number are both validated, but
+        // O5-only (commandSigner != null - see this class's constructor doc), because only
+        // Omnipod 5 pods CRC their responses. Dash pods do not: their response trailer matches
+        // no CRC this code can compute, which is what OmnipodKit's own source means when it
+        // calls the pod-generated CRC's "algorithm is not understood". Enforcing it on a Dash
+        // connection would reject every response the pod ever sends. See [validateCrc] and
+        // [validateSequenceNumber] for the captured traffic each rule is pinned against.
         if (data.size < RESPONSE_ENVELOPE_MIN_SIZE) {
             aapsLogger.warn(LTag.PUMPBTCOMM, "Response envelope shorter than expected (${data.size} bytes): ${data.toHex()}")
         } else {
             val uniqueId = data.copyOfRange(0, 4)
             val lengthAndSequenceNumber = data.copyOfRange(4, 6)
             val crc = data.copyOfRange(data.size - 2, data.size)
-            val computedCrc = MessageUtil.createCrc(data.copyOfRange(0, data.size - 2))
             aapsLogger.debug(
                 LTag.PUMPBTCOMM,
                 "Response envelope fields: uniqueId=${uniqueId.toHex()}, lengthAndSequenceNumber=${lengthAndSequenceNumber.toHex()}, " +
-                    "crc=${crc.toHex()} (computed %04x, mismatch is expected and not an error)".format(computedCrc)
+                    "crc=${crc.toHex()}"
             )
             if (commandSigner != null) {
+                validateCrc(data)
                 lastSentCommandSequenceNumber?.let { validateSequenceNumber(lengthAndSequenceNumber, it) }
             }
         }
         val payload = data.copyOfRange(6, data.size - 2)
 
         return ResponseUtil.parseResponse(payload)
+    }
+
+    /**
+     * Checks the response envelope's trailing CRC, which an Omnipod 5 pod computes over
+     * everything preceding it with the same [MessageUtil.createCrc] this driver already uses
+     * for outgoing messages.
+     *
+     * Rejecting a mismatch matters more than it looks: a badly mangled response would fail to
+     * parse anyway (`ResponseUtil.parseResponse` throws on an unrecognized type), so the case
+     * this actually catches is a *subtly* corrupted status response that still parses - wrong
+     * insulin-delivered counters, reservoir level, or delivery-status bits silently entering
+     * pod state and IOB. Throwing here routes the command into the existing undefined-state
+     * path ([CommandSendErrorConfirming]) instead of confirming it with corrupt data.
+     *
+     * O5-only, and that restriction is load-bearing. Pinned against captured traffic from two
+     * pods of each generation:
+     * - Omnipod 5 (`002a1c6e`, from a Trio installation that hit a real transient corruption
+     *   incident): 495 of 495 pod-generated responses satisfy this CRC, as do all 518 outgoing
+     *   messages - 1013 of 1013 overall.
+     * - Dash (`1749dbcb`, `podTypeValue: 4` in a Loop Report): outgoing messages satisfy it,
+     *   pod responses never do. No initial value in the whole 16-bit space and no byte range
+     *   reproduces them, which is why this must not run on a Dash connection.
+     *
+     * Community confirmation of the same split, from the Omnipod 5 testing discussion: "The
+     * DASH pods do not check the CRC... The Eros and Omnipod 5 pods both do apply the CRC
+     * check before accepting a command."
+     */
+    @Throws(CouldNotParseResponseException::class)
+    internal fun validateCrc(data: ByteArray) {
+        val actual = ByteBuffer.wrap(data, data.size - 2, 2).short.toInt() and 0xffff
+        val expected = MessageUtil.createCrc(data.copyOfRange(0, data.size - 2)).toInt() and 0xffff
+        if (actual != expected) {
+            throw CouldNotParseResponseException(
+                "Response CRC mismatch: expected %04x, got %04x".format(expected, actual)
+            )
+        }
     }
 
     /**
