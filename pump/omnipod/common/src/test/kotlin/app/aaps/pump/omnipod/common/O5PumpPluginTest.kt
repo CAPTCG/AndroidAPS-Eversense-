@@ -38,9 +38,11 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.atLeast
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -82,6 +84,7 @@ class O5PumpPluginTest : TestBaseWithProfile() {
         whenever(rh.gs(R.string.omnipod_common_error_unsupported_custom_command)).thenReturn("Unsupported custom command: %1\$s")
         whenever(rh.gs(R.string.omnipod_5_error_no_active_profile)).thenReturn("No active profile")
         whenever(rh.gs(R.string.omnipod_5_error_no_active_alerts)).thenReturn("No active alerts")
+        whenever(rh.gs(R.string.omnipod_5_error_unresolved_dose_pending)).thenReturn("Earlier dose unconfirmed")
     }
 
     // -- isBusy / isConnected / isInitialized (the exact bug class already hit once) -------
@@ -662,5 +665,80 @@ class O5PumpPluginTest : TestBaseWithProfile() {
         runBlocking { plugin.reconcilePendingDose() }
 
         verify(podStateManager, never()).pendingDoseCommand = anyOrNull()
+    }
+
+    // -- the stacking guard: never send a dose on top of one whose outcome is still unknown ---
+    //
+    // Mirrors OmnipodKit's tryToResolvePendingCommand: read status first and only refuse if the
+    // earlier dose is *still* undecided afterwards, so the common "pod is back" case proceeds.
+
+    @Test
+    fun `a temp basal is refused while an earlier dose stays unresolved`() {
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.podId).thenReturn(12345L)
+        // Never resolves: the pod keeps reporting a sequence that does not match.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 4))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+
+        val result = runBlocking {
+            plugin.setTempBasalAbsolute(1.0, 30, false, PumpSync.TemporaryBasalType.NORMAL)
+        }
+
+        assertThat(result.success).isFalse()
+        assertThat(result.enacted).isFalse()
+    }
+
+    @Test
+    fun `a bolus is refused while an earlier dose stays unresolved and no insulin is reported`() {
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.podId).thenReturn(12345L)
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 4))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+
+        val result = runBlocking {
+            plugin.deliverTreatment(DetailedBolusInfo().also { it.insulin = 2.0; it.carbs = 0.0 })
+        }
+
+        assertThat(result.success).isFalse()
+        assertThat(result.enacted).isFalse()
+        assertThat(result.bolusDelivered).isEqualTo(0.0)
+    }
+
+    @Test
+    fun `the guard lets a command through once the status read settles the earlier dose`() {
+        // The pod is reachable again and its sequence number matches, so the pending dose
+        // resolves and the new command must not be blocked. Modelled by the state manager
+        // reporting a pending dose first and null after reconciliation clears it.
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.podId).thenReturn(12345L)
+        whenever(podStateManager.pendingDoseCommand)
+            .thenReturn(pendingBolus(sequenceNumber = 9))
+            .thenReturn(null)
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+
+        runBlocking { plugin.setTempBasalAbsolute(1.0, 30, false, PumpSync.TemporaryBasalType.NORMAL) }
+
+        // A status read plus the temp basal itself - not refused before reaching the pod.
+        verify(bleManager, atLeast(2)).sendCommand(any(), any())
+    }
+
+    @Test
+    fun `nothing pending means no extra status read before a dose`() {
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.podId).thenReturn(12345L)
+        whenever(podStateManager.pendingDoseCommand).thenReturn(null)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+
+        runBlocking { plugin.setTempBasalAbsolute(1.0, 30, false, PumpSync.TemporaryBasalType.NORMAL) }
+
+        // Only the temp basal command itself, no resolution round trip.
+        verify(bleManager, times(1)).sendCommand(any(), any())
     }
 }

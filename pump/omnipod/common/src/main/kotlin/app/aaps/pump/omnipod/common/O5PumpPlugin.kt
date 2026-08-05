@@ -433,6 +433,44 @@ class O5PumpPlugin @Inject constructor(
     }
 
     /**
+     * Clears the way for a new dose-affecting command, returning false if it must not be sent.
+     *
+     * A [O5PodStateManager.pendingDoseCommand] means an earlier dose may or may not have
+     * reached the pod. Issuing another one on top of that risks stacking a second dose onto a
+     * first that did land, so this first tries to settle the question the same way OmnipodKit's
+     * `PodCommsSession.tryToResolvePendingCommand` does - read status, reconcile, and proceed
+     * only if the pending marker actually cleared.
+     *
+     * Note this resolves rather than merely refuses: in the ordinary case where the pod is
+     * reachable again, the status read settles the outcome and the new command goes ahead
+     * normally. Refusal is reserved for a pod that still cannot be reached or whose status
+     * leaves the earlier dose undecided.
+     *
+     * Deliberately *not* applied to pod deactivation. Blocking a user from taking a pod off
+     * because the driver is unsure about a temp basal is the wrong trade, and deactivation
+     * never sets a pending marker of its own.
+     */
+    private suspend fun pendingDoseResolved(): Boolean {
+        if (podStateManager.pendingDoseCommand == null) return true
+        return try {
+            fetchStatus().blockingAwait()
+            reconcilePendingDose()
+            val resolved = podStateManager.pendingDoseCommand == null
+            if (!resolved) {
+                aapsLogger.warn(LTag.PUMP, "O5 refusing new dose command: an earlier dose is still unresolved after a status read")
+            }
+            resolved
+        } catch (e: Exception) {
+            aapsLogger.warn(LTag.PUMP, "O5 refusing new dose command: could not read status to resolve the pending dose", e)
+            false
+        }
+    }
+
+    private fun unresolvedDoseResult(): PumpEnactResult =
+        pumpEnactResultProvider.get().success(false).enacted(false)
+            .comment(rh.gs(R.string.omnipod_5_error_unresolved_dose_pending))
+
+    /**
      * Whether the pod's delivery status positively shows [pending] took effect - the fallback
      * for when the sequence number cannot decide it (mirrors OmnipodKit's
      * `checkCommandAgainstStatus`).
@@ -463,6 +501,7 @@ class O5PumpPlugin @Inject constructor(
             // nothing paired yet - same "prevent setBasal requests" guard Dash uses
             return pumpEnactResultProvider.get().success(true).enacted(true)
         }
+        if (!pendingDoseResolved()) return unresolvedDoseResult()
         val basalProgram = mapProfileToBasalProgram(profile, PumpType.OMNIPOD_5)
         return try {
             if (podStateManager.deliveryStatus?.suspended() != true) {
@@ -549,6 +588,10 @@ class O5PumpPlugin @Inject constructor(
         require(detailedBolusInfo.carbs == 0.0) { detailedBolusInfo.toString() }
         require(detailedBolusInfo.insulin > 0) { detailedBolusInfo.toString() }
 
+        if (!pendingDoseResolved()) {
+            return pumpEnactResultProvider.get().success(false).enacted(false).bolusDelivered(0.0)
+                .comment(rh.gs(R.string.omnipod_5_error_unresolved_dose_pending))
+        }
         try {
             bolusDeliveryInProgress = true
             // Refresh the reservoir from current pod state before the gate below, same staleness
@@ -693,6 +736,7 @@ class O5PumpPlugin @Inject constructor(
         tbrType: PumpSync.TemporaryBasalType
     ): PumpEnactResult {
         aapsLogger.info(LTag.PUMP, "O5 setTempBasalAbsolute: rate=$absoluteRate U/h duration=$durationInMinutes min enforce=$enforceNew type=$tbrType")
+        if (!pendingDoseResolved()) return unresolvedDoseResult()
         return try {
             if (podStateManager.deliveryStatus?.tempBasalActive() == true) {
                 cancelActiveTempBasal()
@@ -746,6 +790,7 @@ class O5PumpPlugin @Inject constructor(
         if (podStateManager.deliveryStatus?.tempBasalActive() != true && pumpSync.expectedPumpState().temporaryBasal == null) {
             return pumpEnactResultProvider.get().success(true).enacted(false)
         }
+        if (!pendingDoseResolved()) return unresolvedDoseResult()
         return try {
             cancelActiveTempBasal()
             pumpEnactResultProvider.get().success(true).enacted(true)
@@ -1042,6 +1087,15 @@ class O5PumpPlugin @Inject constructor(
         if (!needsBasalCorrection()) {
             aapsLogger.info(LTag.PUMP, "O5 basal correction no longer appropriate")
             return pumpEnactResultProvider.get().success(true).enacted(false)
+        }
+        // Same stacking guard the dose entry points get, but plain refusal rather than
+        // [pendingDoseResolved]'s resolve-first: this is not a suspend function, and making it
+        // one would ripple out through the non-suspend executeCustomCommand path for the sake
+        // of a single 0.05 U pulse. Skipping one correction is harmless - the next status poll
+        // reconciles the pending dose and the correction is reconsidered from scratch.
+        if (podStateManager.pendingDoseCommand != null) {
+            aapsLogger.info(LTag.PUMP, "O5 basal correction skipped: an earlier dose is still unresolved")
+            return pumpEnactResultProvider.get().success(false).enacted(false)
         }
         podStateManager.lastBasalCorrectionTime = System.currentTimeMillis()
 
