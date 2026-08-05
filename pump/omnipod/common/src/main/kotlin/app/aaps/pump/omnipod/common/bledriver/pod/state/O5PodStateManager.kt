@@ -130,6 +130,21 @@ interface O5PodStateManager {
          *  call never reached its own sync step. */
         val bolusType: BS.Type? = null,
         val startedAt: Long,
+        /**
+         * The 4-bit command sequence number this dose was sent with, captured from
+         * [msgSequenceNumber] immediately before building the command.
+         *
+         * This is what makes an uncertain outcome *decidable* rather than guessable: the pod
+         * reports the sequence number of the last programming command it accepted (see
+         * [sequenceNumberOfLastProgrammingCommand]), so comparing the two answers "did the pod
+         * actually get this command" outright. Without it, reconciliation can only look at
+         * whether delivery is currently active, which cannot tell a bolus that finished from
+         * one that never started.
+         *
+         * Null only for a [PendingDoseCommand] restored from a state file written before this
+         * field existed; reconciliation falls back to the delivery-status heuristic then.
+         */
+        val sequenceNumber: Short? = null,
         /** True only for the micro-bolus [app.aaps.pump.omnipod.common.O5PumpPlugin
          *  .deliverBasalCorrection] issues - excluded from [cumulativeBolusPulsesDelivered]
          *  tracking so it counts toward delivered *basal* insulin, not bolus insulin

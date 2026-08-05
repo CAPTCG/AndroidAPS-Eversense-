@@ -344,9 +344,47 @@ class O5PumpPlugin @Inject constructor(
      * call whose BLE response never arrived - see this class's doc comment. Called after
      * every successful status read, so an uncertain outcome is recovered automatically
      * rather than only on the next user-triggered action.
+     *
+     * Decides in the same order OmnipodKit's `PodCommsSession.recoverUnacknowledgedCommand`
+     * does:
+     *  1. **Authoritative** - the pod reports the sequence number of the last programming
+     *     command it accepted ([O5PodStateManager.sequenceNumberOfLastProgrammingCommand]).
+     *     If it equals the number this dose was sent with, the pod definitely got it.
+     *  2. **Heuristic fallback** - otherwise, a *positive* sign of the delivery actually
+     *     running counts as confirmation ([confirmedByDeliveryStatus]).
+     *  3. **Otherwise the pod never got the command**, so the marker is dropped without
+     *     recording any insulin.
+     *
+     * Step 3 is why the sequence number matters. With only the delivery-status heuristic, an
+     * uncertain bolus that the pod never received looks identical to one that completed - both
+     * report "not currently bolusing" - and the old code resolved that ambiguity by assuming
+     * delivery, crediting `requestedUnits - bolusPulsesRemaining` as insulin that was never
+     * given. That inflates IOB and suppresses later dosing.
      */
-    private suspend fun reconcilePendingDose() {
+    internal suspend fun reconcilePendingDose() {
         val pending = podStateManager.pendingDoseCommand ?: return
+
+        val podSequence = podStateManager.sequenceNumberOfLastProgrammingCommand
+        val sentSequence = pending.sequenceNumber
+        val acceptedByPod = podSequence != null && sentSequence != null &&
+            (podSequence.toInt() and 0x0f) == (sentSequence.toInt() and 0x0f)
+
+        if (!acceptedByPod && !confirmedByDeliveryStatus(pending)) {
+            // Only conclude "never received" when the sequence number actually told us so. A
+            // pre-existing pending command restored from an older state file has no recorded
+            // sequence, and dropping it here would silently discard a dose that may well have
+            // been delivered - fall through to the original delivery-status resolution instead.
+            if (sentSequence != null && podSequence != null) {
+                aapsLogger.info(
+                    LTag.PUMP,
+                    "O5 pending ${pending.type} was not received by the pod " +
+                        "(sent sequence $sentSequence, pod's last programming sequence $podSequence) - recording no delivery"
+                )
+                podStateManager.pendingDoseCommand = null
+                return
+            }
+        }
+
         when (pending.type) {
             O5PodStateManager.PendingDoseType.BOLUS              ->
                 if (podStateManager.deliveryStatus?.bolusDeliveringActive() != true) {
@@ -394,6 +432,27 @@ class O5PumpPlugin @Inject constructor(
         }
     }
 
+    /**
+     * Whether the pod's delivery status positively shows [pending] took effect - the fallback
+     * for when the sequence number cannot decide it (mirrors OmnipodKit's
+     * `checkCommandAgainstStatus`).
+     *
+     * Deliberately only ever answers true on a *positive* observation. "Not currently
+     * bolusing" is not evidence a bolus happened, so [O5PodStateManager.PendingDoseType.BOLUS]
+     * has no fallback at all: a bolus whose sequence number did not match is treated as never
+     * received. The cancel cases are the mirror image - delivery having stopped is the
+     * positive observation there.
+     */
+    private fun confirmedByDeliveryStatus(pending: O5PodStateManager.PendingDoseCommand): Boolean {
+        val status = podStateManager.deliveryStatus ?: return false
+        return when (pending.type) {
+            O5PodStateManager.PendingDoseType.BOLUS             -> status.bolusDeliveringActive()
+            O5PodStateManager.PendingDoseType.TEMP_BASAL_START  -> status.tempBasalActive()
+            O5PodStateManager.PendingDoseType.TEMP_BASAL_CANCEL -> !status.tempBasalActive()
+            O5PodStateManager.PendingDoseType.BASAL_PROGRAM     -> status.basalActive()
+        }
+    }
+
     private fun requirePodId(): Int =
         podStateManager.podId?.toInt() ?: throw IllegalStateException("O5 pod not paired")
 
@@ -418,7 +477,8 @@ class O5PumpPlugin @Inject constructor(
 
             podStateManager.pendingDoseCommand = O5PodStateManager.PendingDoseCommand(
                 type = O5PodStateManager.PendingDoseType.BASAL_PROGRAM,
-                startedAt = System.currentTimeMillis()
+                startedAt = System.currentTimeMillis(),
+                sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
             val basalBeeps = preferences.get(OmnipodBooleanPreferenceKey.BasalBeepsEnabled)
             val cmd = ProgramBasalCommand.Builder()
@@ -514,7 +574,8 @@ class O5PumpPlugin @Inject constructor(
                 type = O5PodStateManager.PendingDoseType.BOLUS,
                 requestedUnits = requestedUnits,
                 bolusType = detailedBolusInfo.bolusType,
-                startedAt = startedAt
+                startedAt = startedAt,
+                sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedUnits
@@ -642,7 +703,8 @@ class O5PumpPlugin @Inject constructor(
                 type = O5PodStateManager.PendingDoseType.TEMP_BASAL_START,
                 requestedRate = absoluteRate,
                 requestedDurationMinutes = durationInMinutes.toShort(),
-                startedAt = startedAt
+                startedAt = startedAt,
+                sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
             val cmd = ProgramTempBasalCommand.Builder()
                 .setUniqueId(requirePodId())
@@ -697,7 +759,8 @@ class O5PumpPlugin @Inject constructor(
     private fun cancelActiveTempBasal() {
         podStateManager.pendingDoseCommand = O5PodStateManager.PendingDoseCommand(
             type = O5PodStateManager.PendingDoseType.TEMP_BASAL_CANCEL,
-            startedAt = System.currentTimeMillis()
+            startedAt = System.currentTimeMillis(),
+            sequenceNumber = podStateManager.msgSequenceNumber.toShort()
         )
         val cmd = StopDeliveryCommand.Builder()
             .setUniqueId(requirePodId())
@@ -1004,7 +1067,8 @@ class O5PumpPlugin @Inject constructor(
                 requestedUnits = requestedInsulinAmount,
                 bolusType = BS.Type.NORMAL,
                 startedAt = startedAt,
-                isBasalCorrection = true
+                isBasalCorrection = true,
+                sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedInsulinAmount

@@ -1,6 +1,7 @@
 package app.aaps.pump.omnipod.common
 
 import app.aaps.core.data.pump.defs.ManufacturerType
+import app.aaps.core.data.model.BS
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.protection.ProtectionCheck
 import app.aaps.core.interfaces.pump.BlePreCheck
@@ -527,5 +528,139 @@ class O5PumpPluginTest : TestBaseWithProfile() {
             verify(pumpSync).insertAnnouncement(any<String>(), any<Long>(), eq(PumpType.OMNIPOD_5), eq("9999"))
         }
         verify(podStateManager).alarmSynced = true
+    }
+
+    // -- reconcilePendingDose: deciding an uncertain dose from the pod's own sequence number -
+    //
+    // The pod reports the sequence number of the last programming command it accepted. Comparing
+    // it against the number the dose was sent with is the only way to tell a bolus that completed
+    // from one the pod never received - both look like "not currently bolusing" afterwards.
+    // Mirrors OmnipodKit's PodCommsSession.recoverUnacknowledgedCommand.
+
+    private fun pendingBolus(sequenceNumber: Short?) = O5PodStateManager.PendingDoseCommand(
+        type = O5PodStateManager.PendingDoseType.BOLUS,
+        requestedUnits = 3.0,
+        bolusType = BS.Type.NORMAL,
+        startedAt = 1_000L,
+        sequenceNumber = sequenceNumber
+    )
+
+    @Test
+    fun `an uncertain bolus the pod never received records no insulin`() {
+        // The regression this whole change exists for. Sequence numbers disagree and the pod is
+        // not bolusing, so the command never landed - crediting insulin here would inflate IOB.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 4))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+
+        runBlocking {
+            plugin.reconcilePendingDose()
+
+            verify(pumpSync, never()).syncBolusWithPumpId(
+                any<Long>(), any(), any(), any<Long>(), any(), any<String>()
+            )
+        }
+        verify(podStateManager).pendingDoseCommand = null
+    }
+
+    @Test
+    fun `an uncertain bolus the pod did receive is finalized`() {
+        // Same observable delivery status as above - only the sequence number distinguishes them.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 9))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+        whenever(podStateManager.bolusPulsesRemaining).thenReturn(0)
+        whenever(podStateManager.lastBolusDeliveredUnits).thenReturn(null)
+        whenever(podStateManager.podId).thenReturn(9999L)
+
+        runBlocking {
+            plugin.reconcilePendingDose()
+
+            verify(pumpSync).syncBolusWithPumpId(
+                any<Long>(), any(), any(), any<Long>(), eq(PumpType.OMNIPOD_5), eq("9999")
+            )
+        }
+        verify(podStateManager).pendingDoseCommand = null
+    }
+
+    @Test
+    fun `a still-running bolus is confirmed by delivery status even when the sequence disagrees`() {
+        // The positive-observation fallback: the pod is actively bolusing, so it clearly got it.
+        // Left pending here because the bolus has not finished yet.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 4))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
+
+        runBlocking { plugin.reconcilePendingDose() }
+
+        verify(podStateManager, never()).pendingDoseCommand = null
+    }
+
+    @Test
+    fun `sequence numbers are compared as 4 bits so a wrapped counter still matches`() {
+        // msgSequenceNumber is a Byte that wraps at 16; the pod reports 4 bits. Comparing the
+        // raw values would fail to match here and wrongly discard a delivered dose.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = 0x1F))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(0x0F)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+        whenever(podStateManager.bolusPulsesRemaining).thenReturn(0)
+        whenever(podStateManager.lastBolusDeliveredUnits).thenReturn(null)
+        whenever(podStateManager.podId).thenReturn(9999L)
+
+        runBlocking {
+            plugin.reconcilePendingDose()
+
+            verify(pumpSync).syncBolusWithPumpId(
+                any<Long>(), any(), any(), any<Long>(), eq(PumpType.OMNIPOD_5), eq("9999")
+            )
+        }
+    }
+
+    @Test
+    fun `a pending dose restored without a sequence number falls back to the old resolution`() {
+        // Migration case: state files written before the sequence number was recorded must not
+        // have their dose silently discarded.
+        whenever(podStateManager.pendingDoseCommand).thenReturn(pendingBolus(sequenceNumber = null))
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+        whenever(podStateManager.bolusPulsesRemaining).thenReturn(0)
+        whenever(podStateManager.lastBolusDeliveredUnits).thenReturn(null)
+        whenever(podStateManager.podId).thenReturn(9999L)
+
+        runBlocking {
+            plugin.reconcilePendingDose()
+
+            verify(pumpSync).syncBolusWithPumpId(
+                any<Long>(), any(), any(), any<Long>(), eq(PumpType.OMNIPOD_5), eq("9999")
+            )
+        }
+    }
+
+    @Test
+    fun `an uncertain temp basal the pod never received is dropped without activating one`() {
+        whenever(podStateManager.pendingDoseCommand).thenReturn(
+            O5PodStateManager.PendingDoseCommand(
+                type = O5PodStateManager.PendingDoseType.TEMP_BASAL_START,
+                requestedRate = 0.5,
+                requestedDurationMinutes = 30,
+                startedAt = 1_000L,
+                sequenceNumber = 4
+            )
+        )
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BASAL_ACTIVE)
+
+        runBlocking { plugin.reconcilePendingDose() }
+
+        verify(podStateManager).pendingDoseCommand = null
+    }
+
+    @Test
+    fun `reconcile is a no-op when nothing is pending`() {
+        whenever(podStateManager.pendingDoseCommand).thenReturn(null)
+
+        runBlocking { plugin.reconcilePendingDose() }
+
+        verify(podStateManager, never()).pendingDoseCommand = anyOrNull()
     }
 }
