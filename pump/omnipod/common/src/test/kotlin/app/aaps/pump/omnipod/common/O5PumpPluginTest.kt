@@ -17,6 +17,7 @@ import app.aaps.pump.omnipod.common.bledriver.pod.definition.ActivationProgress
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.AlarmType
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.AlertType
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.DeliveryStatus
+import app.aaps.pump.omnipod.common.bledriver.pod.definition.PodStatus
 import app.aaps.pump.omnipod.common.bledriver.pod.state.O5PodStateManager
 import app.aaps.pump.omnipod.common.queue.command.CommandDeactivatePod
 import app.aaps.pump.omnipod.common.queue.command.CommandDeliverBasalCorrection
@@ -468,6 +469,52 @@ class O5PumpPluginTest : TestBaseWithProfile() {
 
     // -- checkPodFault: a real pod fault must produce a user-facing notification, not just -
     // -- silent internal state (the gap Dash didn't have but O5 originally did) ------------
+
+    // The regression these guard: checkPodFault() used to start `alarmType ?: return`, but
+    // alarmType is only ever set from an alarm-status response - which the pod sends solely when
+    // asked, and which Session turns into a failed command whose response was then discarded. So
+    // a faulted pod produced no notification at all. The trigger is now isPodKaput, refreshed by
+    // every routine status poll. (isPodKaput is stubbed here because it is a default interface
+    // getter that a mock bypasses; its derivation from podStatus is covered in
+    // PersistedO5PodStateManagerTest.)
+
+    @Test
+    fun `a faulted pod is reported even when the fault code was never read`() {
+        whenever(podStateManager.alarmSynced).thenReturn(false)
+        whenever(podStateManager.isPodKaput).thenReturn(true)
+        whenever(podStateManager.alarmType).thenReturn(null)
+        whenever(podStateManager.podStatus).thenReturn(PodStatus.ALARM)
+        whenever(podStateManager.podId).thenReturn(9999L)
+        whenever(commandQueue.isCustomCommandInQueue(CommandDeactivatePod::class.java)).thenReturn(false)
+        // The alarm-page read fails, as it does in the field when the pod has stopped responding.
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.error(RuntimeException("pod unreachable")))
+
+        runBlocking {
+            plugin.checkPodFault()
+
+            verify(notificationManager).post(
+                eq(NotificationId.OMNIPOD_POD_FAULT), any<String>(), level = any(), validMinutes = any(),
+                soundRes = anyOrNull(), actions = any(), validityCheck = anyOrNull()
+            )
+            verify(pumpSync).insertAnnouncement(any<String>(), any<Long>(), eq(PumpType.OMNIPOD_5), eq("9999"))
+        }
+        verify(podStateManager).alarmSynced = true
+    }
+
+    @Test
+    fun `a healthy pod is not reported`() {
+        whenever(podStateManager.alarmSynced).thenReturn(false)
+        whenever(podStateManager.isPodKaput).thenReturn(false)
+        whenever(podStateManager.alarmType).thenReturn(null)
+
+        runBlocking { plugin.checkPodFault() }
+
+        verify(notificationManager, never()).post(
+            any(), any<String>(), level = any(), validMinutes = any(),
+            soundRes = anyOrNull(), actions = any(), validityCheck = anyOrNull()
+        )
+        verify(podStateManager, never()).alarmSynced = true
+    }
 
     @Test
     fun `checkPodFault posts a notification and records an announcement on a new alarm`() {

@@ -5,6 +5,7 @@ import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.ActivationProgress
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.AlarmType
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.AlertType
+import app.aaps.pump.omnipod.common.bledriver.pod.definition.PodStatus
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.BasalProgram
 import app.aaps.pump.omnipod.common.bledriver.pod.response.AlarmStatusResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.DefaultStatusResponse
@@ -250,6 +251,45 @@ class PersistedO5PodStateManagerTest : TestBase() {
         assertThat(reader.totalPulsesDelivered).isEqualTo(response.totalPulsesDelivered)
         assertThat(reader.reservoirPulsesRemaining).isEqualTo(response.reservoirPulsesRemaining)
         assertThat(reader.minutesSinceActivation).isEqualTo(response.minutesSinceActivation)
+    }
+
+    // isPodKaput is what O5PumpPlugin.checkPodFault() triggers on, and it is derived from
+    // podStatus - which every routine status poll refreshes - rather than from alarmType, which
+    // only arrives if something explicitly asks for the alarm page. Verified against a real
+    // manager because the derivation is a default interface getter that a mock would bypass.
+
+    @Test
+    fun `isPodKaput is true once a status response reports ALARM`() {
+        // encoded[1] low nibble is podStatus; 0x1D -> 0x0d = ALARM
+        val response = DefaultStatusResponse(hexToBytes("1D1D00A02800000463FF"))
+        val manager = newManager()
+        assertThat(manager.isPodKaput).isFalse()
+
+        manager.updateFromDefaultStatusResponse(response)
+
+        assertThat(manager.podStatus).isEqualTo(PodStatus.ALARM)
+        assertThat(manager.isPodKaput).isTrue()
+    }
+
+    @Test
+    fun `isPodKaput is true once a status response reports DEACTIVATED`() {
+        // 0x1F -> 0x0f = DEACTIVATED
+        val manager = newManager()
+
+        manager.updateFromDefaultStatusResponse(DefaultStatusResponse(hexToBytes("1D1F00A02800000463FF")))
+
+        assertThat(manager.podStatus).isEqualTo(PodStatus.DEACTIVATED)
+        assertThat(manager.isPodKaput).isTrue()
+    }
+
+    @Test
+    fun `isPodKaput stays false for a normally running pod`() {
+        val manager = newManager()
+
+        manager.updateFromDefaultStatusResponse(DefaultStatusResponse(hexToBytes("1D1800A02800000463FF")))
+
+        assertThat(manager.podStatus).isEqualTo(PodStatus.RUNNING_ABOVE_MIN_VOLUME)
+        assertThat(manager.isPodKaput).isFalse()
     }
 
     @Test

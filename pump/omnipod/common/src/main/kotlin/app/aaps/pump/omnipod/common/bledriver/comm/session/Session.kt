@@ -34,7 +34,17 @@ data class CommandSendErrorConfirming(val msg: String) : CommandSendResult()
 
 sealed class CommandReceiveResult
 data class CommandReceiveSuccess(val result: Response) : CommandReceiveResult()
-data class CommandReceiveError(val msg: String) : CommandReceiveResult()
+
+/**
+ * The command failed, but [result] is non-null when the pod still sent a well-formed reply
+ * saying so - a NAK, or an alarm-status response reporting a fault.
+ *
+ * Carrying it matters: a fault arrives *as* a failed command, so discarding the response
+ * discards the only notice that the pod has faulted. Callers should still report the command
+ * as failed, but record the pod state the reply carries first (see
+ * `O5BleManagerImpl.sendCommand`).
+ */
+data class CommandReceiveError(val msg: String, val result: Response? = null) : CommandReceiveResult()
 data class CommandAckError(val result: Response, val msg: String) : CommandReceiveResult()
 
 class Session(
@@ -119,8 +129,12 @@ class Session(
         // pod-rejected command silently completed as if it had been accepted. Still ACK it above (the
         // pod is waiting for acknowledgement of receipt regardless of what it sent) - only the
         // reported outcome changes here.
+        //
+        // The response travels with the error rather than being dropped - see
+        // [CommandReceiveError]. An alarm-status response *is* how a fault is reported, so
+        // discarding it here would throw away the pod's only notice that it has faulted.
         if (response is NakResponse || response is AlarmStatusResponse) {
-            return CommandReceiveError("Pod rejected command or reported a fault: $response")
+            return CommandReceiveError("Pod rejected command or reported a fault: $response", response)
         }
         return CommandReceiveSuccess(response)
     }

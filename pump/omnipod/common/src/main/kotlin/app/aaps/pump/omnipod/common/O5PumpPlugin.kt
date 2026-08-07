@@ -50,6 +50,7 @@ import app.aaps.pump.omnipod.common.bledriver.pod.definition.BeepType
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.O5_FIXED_NONCE
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.PodConstants
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.ProgramReminder
+import app.aaps.pump.omnipod.common.bledriver.pod.response.AlarmStatusResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.DefaultStatusResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.PodInfoActivationTimeResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.PodInfoTriggeredAlertsResponse
@@ -283,21 +284,56 @@ class O5PumpPlugin @Inject constructor(
      */
     internal suspend fun checkPodFault() {
         if (podStateManager.alarmSynced) return
-        val alarm = podStateManager.alarmType ?: return
+        // [O5PodStateManager.isPodKaput] is the trigger, not alarmType. alarmType only ever
+        // arrives with an alarm-status response, which the pod sends solely in reply to an
+        // explicit request for that page - so gating on it alone meant a faulted pod was never
+        // reported at all. podStatus comes back on every routine status poll.
+        if (!podStateManager.isPodKaput && podStateManager.alarmType == null) return
+
+        // Faulted but the reason is not known yet - ask for it. Best effort: the request fails
+        // by design (an alarm-status reply is a failed command, see CommandReceiveError), but
+        // the response is recorded on the way through, which is what populates alarmType.
+        if (podStateManager.alarmType == null) {
+            try {
+                fetchAlarmStatus().blockingAwait()
+            } catch (e: Exception) {
+                aapsLogger.debug(LTag.PUMP, "O5 could not read the alarm status page: ${e.message}")
+            }
+        }
+
+        // Fall back to the pod status itself when the fault code could not be read, so the user
+        // is still told the pod has stopped rather than told nothing.
+        val description = podStateManager.alarmType?.toString()
+            ?: podStateManager.podStatus?.toString()
+            ?: return
+
         if (!commandQueue.isCustomCommandInQueue(CommandDeactivatePod::class.java)) {
             notificationManager.post(
                 NotificationId.OMNIPOD_POD_FAULT,
-                alarm.toString(),
+                description,
                 soundRes = app.aaps.core.ui.R.raw.boluserror
             )
         }
         pumpSync.insertAnnouncement(
-            error = alarm.toString(),
+            error = description,
             pumpId = System.currentTimeMillis(),
             pumpType = PumpType.OMNIPOD_5,
             pumpSerial = serialNumber()
         )
         podStateManager.alarmSynced = true
+    }
+
+    /**
+     * Reads status page 2, the pod's fault detail, to learn *why* it faulted. Mirrors the Dash
+     * driver, which requests this page explicitly - the pod never volunteers it.
+     */
+    private fun fetchAlarmStatus(): Completable = Completable.defer {
+        val cmd = GetStatusCommand.Builder()
+            .setUniqueId(requirePodId())
+            .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
+            .setStatusResponseType(ResponseType.StatusResponseType.ALARM_STATUS)
+            .build()
+        bleManager.sendCommand(cmd, AlarmStatusResponse::class).ignoreElements()
     }
 
     private fun fetchStatus(): Completable = Completable.defer {

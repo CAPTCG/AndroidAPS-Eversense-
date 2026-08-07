@@ -156,6 +156,18 @@ interface O5PodStateManager {
 
     val podStatus: PodStatus?
     val deliveryStatus: DeliveryStatus?
+
+    /**
+     * The pod has stopped delivering for good - it faulted or was deactivated.
+     *
+     * Derived from [podStatus], which every routine status poll refreshes, so this is the
+     * dependable fault signal. [alarmType] carries the *reason* but only arrives with an
+     * alarm-status response, which the pod sends solely in reply to an explicit request for
+     * that page - so a fault would otherwise go unnoticed until something asked. Mirrors the
+     * Dash driver's `isPodKaput`.
+     */
+    val isPodKaput: Boolean
+        get() = podStatus in arrayOf(PodStatus.ALARM, PodStatus.DEACTIVATED)
     val firmwareVersion: SoftwareVersion?
     val bleVersion: SoftwareVersion?
     val lotNumber: Long?

@@ -136,6 +136,11 @@ class O5BleManagerImpl @Inject constructor(
                     }
 
                     is CommandReceiveError   -> {
+                        // Still a failed command, but record whatever pod state the reply carried
+                        // first: a pod fault is delivered *as* a failed command (an alarm-status
+                        // response), so dropping it here would leave the fault entirely unrecorded
+                        // and O5PumpPlugin.checkPodFault() with nothing to report.
+                        readResult.result?.let { recordStatusIfPresent(it) }
                         emitter.tryOnError(MessageIOException("Could not read response: $readResult"))
                         return@create
                     }
