@@ -18,7 +18,21 @@ interface Automation {
     val executionEnabled: Boolean
 
     fun findEventById(id: String): AutomationEvent?
-    suspend fun processEvent(someEvent: AutomationEvent)
+
+    /**
+     * Run an automation event's actions.
+     *
+     * @param userInitiated true when a person pressed something to run this - the home screen
+     *   Automation sheet, quick launch, a wear tile - as opposed to the periodic loop deciding a
+     *   rule should fire. A user-initiated run **skips the event's trigger check**: the trigger
+     *   answers "when should this fire by itself", and pressing the button is the user answering
+     *   it. Without this, a rule flagged as a user action but carrying any real condition is
+     *   offered as a button, confirmed, and then silently does nothing.
+     *
+     *   Per-action preconditions are still enforced either way - those are the actions' own
+     *   safety guards, not a schedule, and a manual run is no reason to skip them.
+     */
+    suspend fun processEvent(someEvent: AutomationEvent, userInitiated: Boolean = false)
 
     /**
      * Generate reminder via [app.aaps.plugins.automation.TimerUtil]

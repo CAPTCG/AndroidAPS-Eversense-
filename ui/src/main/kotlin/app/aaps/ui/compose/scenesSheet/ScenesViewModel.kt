@@ -180,6 +180,12 @@ class ScenesViewModel @Inject constructor(
                     actionIcons = event.actionIcons().toList(),
                     // A global blocker (master offline, loop paused, pump/profile not ready) applies
                     // to everything; otherwise a rule is blocked only by its own condition.
+                    //
+                    // The condition gate is not cosmetic and must not be relaxed here alone:
+                    // AutomationRuntime.processEvent re-checks canRun() before doing anything, so
+                    // presenting a rule as tappable while its trigger is false produces a
+                    // confirmation dialog followed by silence. Letting a user action ignore its
+                    // condition means changing that check too.
                     activationReason = automationReason
                         ?: if (event.canRun()) null else rh.gs(R.string.automation_condition_not_met)
                 )

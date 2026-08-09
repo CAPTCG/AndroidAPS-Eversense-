@@ -5,12 +5,14 @@ import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.automation.AutomationEvent
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.logging.UserEntryLogger
+import app.aaps.core.interfaces.pump.PumpEnactResult
 import app.aaps.core.interfaces.receivers.ReceiverStatusStore
 import app.aaps.core.interfaces.scenes.SceneAutomationApi
 import app.aaps.plugins.automation.actions.Action
 import app.aaps.plugins.automation.services.LocationServiceHelper
 import app.aaps.plugins.automation.triggers.Trigger
 import app.aaps.plugins.automation.triggers.TriggerConnector
+import app.aaps.plugins.automation.triggers.TriggerDummy
 import app.aaps.plugins.automation.triggers.TriggerLocation
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
@@ -105,6 +107,54 @@ class AutomationRuntimeTest : TestBaseWithProfile() {
         val event = AutomationEventObject(injector).apply { actions.add(action) }
         automationRuntime.processEvent(event)
         verifyNoInteractions(action) // guard returned before the actions loop
+    }
+
+    // A rule flagged as a user action is a button. Its trigger answers "when should this fire by
+    // itself", and pressing the button is the user answering that question - so a user-initiated
+    // run must not be refused for a trigger that happens to be false. Before this, such a rule was
+    // offered on the home screen and in quick launch, confirmed, and then silently did nothing.
+
+    @Test
+    fun `a user-initiated run executes even when the trigger is false`() = runTest {
+        whenever(config.APS).thenReturn(true)
+        val action = mock<Action>()
+        whenever(action.isValid()).thenReturn(true)
+        whenever(action.shortDescription()).thenReturn("test action")
+        // doAction()'s result is dereferenced for the execution log, so it must be non-null.
+        // Built and stubbed before use - nesting a mock's stubbing inside another whenever()
+        // trips Mockito's UnfinishedStubbingException.
+        val actionResult = mock<PumpEnactResult>()
+        whenever(actionResult.success).thenReturn(true)
+        whenever(actionResult.comment).thenReturn("")
+        whenever(action.doAction()).thenReturn(actionResult)
+        val event = AutomationEventObject(injector).apply {
+            // TriggerConnector(AND) with one always-false child -> shouldRun() is false
+            trigger = TriggerConnector(injector, TriggerConnector.Type.AND).apply {
+                list.add(TriggerDummy(injector, shouldRun = false))
+            }
+            actions.add(action)
+        }
+
+        automationRuntime.processEvent(event, userInitiated = true)
+
+        verify(action).doAction()
+    }
+
+    @Test
+    fun `an automatic run is still refused when the trigger is false`() = runTest {
+        whenever(config.APS).thenReturn(true)
+        val action = mock<Action>()
+        val event = AutomationEventObject(injector).apply {
+            // TriggerConnector(AND) with one always-false child -> shouldRun() is false
+            trigger = TriggerConnector(injector, TriggerConnector.Type.AND).apply {
+                list.add(TriggerDummy(injector, shouldRun = false))
+            }
+            actions.add(action)
+        }
+
+        automationRuntime.processEvent(event)
+
+        verifyNoInteractions(action)
     }
 
     @Test

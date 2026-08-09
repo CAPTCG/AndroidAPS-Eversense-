@@ -822,7 +822,9 @@ class MainViewModel @Inject constructor(
         when (action) {
             is ConfirmableAction.ExecuteAutomation       -> {
                 val event = automation.findEventById(action.automationId) ?: return@launch
-                viewModelScope.launch { automation.processEvent(event) }
+                // The user pressed this and confirmed it - run it whether or not the rule's own
+                // trigger currently holds. Quick launch and the Automation sheet both land here.
+                viewModelScope.launch { automation.processEvent(event, userInitiated = true) }
             }
 
             is ConfirmableAction.DeactivateScene         ->

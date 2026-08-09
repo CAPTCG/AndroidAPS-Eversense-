@@ -107,7 +107,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation) { processEvent(event) }
+        verifyBlocking(automation) { processEvent(event, false) }
         verify(rh, never()).gs(R.string.user_action_not_available, "title")
     }
 
@@ -117,7 +117,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("missing", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -128,7 +128,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -139,7 +139,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -150,7 +150,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -173,7 +173,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -186,7 +186,7 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
 
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
         verify(rh).gs(R.string.user_action_not_available, "title")
     }
 
@@ -197,6 +197,6 @@ class DataHandlerMobileUserActionTest : TestBaseWithProfile() {
         sut.handleUserActionConfirmed(EventData.ActionUserActionConfirmed("evt-uuid", "title"))
 
         verify(automation, never()).findEventById(any())
-        verifyBlocking(automation, never()) { processEvent(any()) }
+        verifyBlocking(automation, never()) { processEvent(any(), any()) }
     }
 }

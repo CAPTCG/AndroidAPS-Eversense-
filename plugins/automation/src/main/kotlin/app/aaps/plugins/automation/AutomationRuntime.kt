@@ -540,10 +540,15 @@ class AutomationRuntime @Inject constructor(
         requestPersist() // persist last-run time (edit-driven trigger; master only)
     }
 
-    override suspend fun processEvent(someEvent: AutomationEvent) {
+    override suspend fun processEvent(someEvent: AutomationEvent, userInitiated: Boolean) {
         if (!config.APS) return // execution is master-only — guards every UI entry point (wear, quick launch, scenes, run-now)
         val event = someEvent as AutomationEventObject
-        if (event.canRun() && event.preconditionCanRun()) {
+        // The trigger says when this should fire on its own. A person pressing the button has
+        // already answered that, so a user-initiated run skips it - otherwise a rule marked as a
+        // user action but carrying any real condition is offered, confirmed, and silently ignored.
+        // Per-action preconditions still apply: they are the actions' own safety guards.
+        val triggerSatisfied = userInitiated || event.canRun()
+        if (triggerSatisfied && event.preconditionCanRun()) {
             val actions = event.actions
             for (action in actions) {
                 action.title = event.title
