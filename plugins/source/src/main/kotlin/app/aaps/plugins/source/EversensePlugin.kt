@@ -481,6 +481,22 @@ class EversensePlugin @Inject constructor(
     }
 
     override fun onCGMRead(type: EversenseType, readings: List<EversenseCGMResult>) {
+        // Log what the BLE layer actually produced, per reading, before anything downstream can
+        // filter or reshape it. The DMS uploader drops readings with no rawResponseHex and keys
+        // the portal record on sensorId, and neither field is visible anywhere else in an exported
+        // log - the Eversense packet classes log through EversenseLogger, which only reaches
+        // logcat. Without this, a reading that never makes it to the portal cannot be told apart
+        // from one the server discarded.
+        //
+        // Backfill readings are the ones to watch: GlucoseHistoryItem carries no sensorId at all,
+        // so anything reconstructed from the transmitter's log arrives here with sensorId empty.
+        readings.forEach { r ->
+            aapsLogger.info(
+                LTag.BGSOURCE,
+                "Eversense CGM read: ts=${r.datetime} glucose=${r.glucoseInMgDl} " +
+                    "rawHexBytes=${r.rawResponseHex.length / 2} sensorId=${if (r.sensorId.isEmpty()) "EMPTY" else r.sensorId}"
+            )
+        }
         val glucoseValues = readings.map { reading ->
             GV(
                 timestamp = reading.datetime,

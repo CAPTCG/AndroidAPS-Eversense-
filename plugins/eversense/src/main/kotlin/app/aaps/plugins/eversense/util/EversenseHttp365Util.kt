@@ -41,6 +41,12 @@ class EversenseHttp365Util {
         /** Readings dropped before sending because they carried no raw BLE data. */
         val skippedNoRawData: Int = 0,
         val httpStatus: Int? = null,
+        /**
+         * Readings POSTed with an empty SensorId. The portal indexes records by that field, so a
+         * reading sent without one can be accepted and still never appear. Backfill readings are
+         * the known source - GlucoseHistoryItem has no sensorId to carry.
+         */
+        val sentWithEmptySensorId: Int = 0,
         /** Server reply, truncated - this is what identifies a silent server-side reject. */
         val responseBody: String = "",
         val error: String? = null
@@ -48,7 +54,8 @@ class EversenseHttp365Util {
 
         /** One line, safe for the log: no token, no credentials, body clipped. */
         fun describe(): String =
-            "sent=$sentCount skippedNoRawData=$skippedNoRawData status=${httpStatus ?: "-"}" +
+            "sent=$sentCount skippedNoRawData=$skippedNoRawData emptySensorId=$sentWithEmptySensorId " +
+                "status=${httpStatus ?: "-"}" +
                 (error?.let { " error=$it" } ?: "") +
                 (if (responseBody.isNotBlank()) " body=${responseBody.take(RESPONSE_BODY_LOG_LIMIT)}" else "")
 
@@ -237,6 +244,11 @@ class EversenseHttp365Util {
 
                 EversenseLogger.info(TAG, "Uploading ${uploadable.size} reading(s) — TransmitterId='$transmitterSerialNumber'")
 
+                // Counted, not filtered: a reading with no sensorId is still sent, because dropping
+                // it would trade one silent loss for another. Reported so a portal gap can be tied
+                // to the empty index key rather than guessed at.
+                val emptySensorIds = uploadable.count { it.sensorId.isEmpty() }
+
                 // SensorId: the official app stores the first 8 bytes of the raw sensor ID in reversed
                 // byte order, uppercase — matching what the DMS portal indexes readings by.
                 // EssentialLog: base64-encoded bytes — the .NET server model uses System.Byte[] which
@@ -276,6 +288,7 @@ class EversenseHttp365Util {
                         sentCount = 0,
                         skippedNoRawData = readings.size - uploadable.size,
                         httpStatus = responseCode,
+                        sentWithEmptySensorId = emptySensorIds,
                         responseBody = error
                     )
                 } else {
@@ -288,6 +301,7 @@ class EversenseHttp365Util {
                         sentCount = uploadable.size,
                         skippedNoRawData = readings.size - uploadable.size,
                         httpStatus = responseCode,
+                        sentWithEmptySensorId = emptySensorIds,
                         responseBody = responseBody
                     )
                 }
