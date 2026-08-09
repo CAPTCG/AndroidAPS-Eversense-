@@ -538,7 +538,7 @@ class EversensePlugin @Inject constructor(
 
                 if (type == EversenseType.EVERSENSE_365) {
                     // E365 US upload
-                    val uploadOk = try {
+                    val outcome = try {
                         app.aaps.plugins.eversense.util.EversenseHttp365Util.uploadGlucoseReadings(
                             preferences = prefs,
                             readings = readings,
@@ -547,12 +547,18 @@ class EversensePlugin @Inject constructor(
                         )
                     } catch (e: Exception) {
                         aapsLogger.error(LTag.BGSOURCE, "Eversense uploadGlucoseReadings EXCEPTION: ", e)
-                        false
+                        app.aaps.plugins.eversense.util.EversenseHttp365Util.UploadOutcome(success = false, error = e.toString())
                     }
+                    val uploadOk = outcome.success
+                    // Report what was actually sent, not how many readings were handed in - the two
+                    // differ whenever a reading carries no raw BLE data, and reporting the input
+                    // count made silently-dropped readings look like successful uploads. The HTTP
+                    // status and server reply ride along because EversenseLogger's output never
+                    // reaches the exported log file, only logcat.
                     val msg365 = if (uploadOk)
-                        "Eversense cloud upload: ✅ ${readings.size} reading(s) sent"
+                        "Eversense cloud upload: ✅ ${outcome.describe()}"
                     else
-                        "Eversense cloud upload: ❌ failed — check credentials and internet"
+                        "Eversense cloud upload: ❌ failed — ${outcome.describe()}"
                     aapsLogger.info(LTag.BGSOURCE, msg365)
                     // Cloud-upload failures are logged only, not toasted - a routine BLE hiccup
                     // (e.g. a disconnect mid-sync) retries within seconds, and toasting every

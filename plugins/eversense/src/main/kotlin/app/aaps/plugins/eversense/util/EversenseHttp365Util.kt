@@ -22,6 +22,42 @@ import java.util.Locale
 import java.util.TimeZone
 
 class EversenseHttp365Util {
+
+    /**
+     * Outcome of an upload attempt, detailed enough to diagnose from an exported AAPS log.
+     *
+     * Declared on the class rather than inside [Companion] so callers can name it as
+     * `EversenseHttp365Util.UploadOutcome`.
+     *
+     * [EversenseLogger] output never reaches the exported log file - it uses arbitrary string
+     * tags while the file appender only captures AAPS's LTag loggers - so everything needed to
+     * diagnose a missing reading has to travel back to the caller, which logs through
+     * aapsLogger.
+     */
+    data class UploadOutcome(
+        val success: Boolean,
+        /** Readings actually serialized and POSTed. Zero is not a success. */
+        val sentCount: Int = 0,
+        /** Readings dropped before sending because they carried no raw BLE data. */
+        val skippedNoRawData: Int = 0,
+        val httpStatus: Int? = null,
+        /** Server reply, truncated - this is what identifies a silent server-side reject. */
+        val responseBody: String = "",
+        val error: String? = null
+    ) {
+
+        /** One line, safe for the log: no token, no credentials, body clipped. */
+        fun describe(): String =
+            "sent=$sentCount skippedNoRawData=$skippedNoRawData status=${httpStatus ?: "-"}" +
+                (error?.let { " error=$it" } ?: "") +
+                (if (responseBody.isNotBlank()) " body=${responseBody.take(RESPONSE_BODY_LOG_LIMIT)}" else "")
+
+        private companion object {
+
+            const val RESPONSE_BODY_LOG_LIMIT = 300
+        }
+    }
+
     companion object {
         private val TAG = "EversenseHttp365Util"
         private val JSON = Json { ignoreUnknownKeys = true }
@@ -166,18 +202,23 @@ class EversenseHttp365Util {
 
         /**
          * Upload glucose readings to the Eversense DMS cloud.
-         * Returns true if the server accepted the upload (HTTP 2xx), false on any error.
+         *
+         * Returns an [UploadOutcome] rather than a Boolean, because a Boolean hid the two things
+         * that matter when readings go missing from the DMS portal: how many readings were really
+         * sent (as opposed to how many were handed in), and what the server said. Both response
+         * bodies used to be read and then discarded, so a server that accepted the request and
+         * silently dropped the reading looked identical to a genuine success.
          */
         fun uploadGlucoseReadings(
             preferences: SharedPreferences,
             readings: List<EversenseCGMResult>,
             transmitterSerialNumber: String,
             firmwareVersion: String
-        ): Boolean {
-            if (readings.isEmpty()) return true
+        ): UploadOutcome {
+            if (readings.isEmpty()) return UploadOutcome(success = true)
             val token = getOrRefreshToken(preferences) ?: run {
                 EversenseLogger.error(TAG, "Cannot upload glucose — no valid access token")
-                return false
+                return UploadOutcome(success = false, error = "no valid access token")
             }
 
             return try {
@@ -185,7 +226,13 @@ class EversenseHttp365Util {
                 val uploadable = readings.filter { it.rawResponseHex.isNotEmpty() }
                 if (uploadable.isEmpty()) {
                     EversenseLogger.info(TAG, "No readings with raw BLE data to upload — skipping")
-                    return true
+                    // Deliberately not success: nothing reached the server, and reporting this as a
+                    // send is what made dropped readings look like healthy uploads in the log.
+                    return UploadOutcome(
+                        success = false,
+                        skippedNoRawData = readings.size,
+                        error = "no readings carried raw BLE data"
+                    )
                 }
 
                 EversenseLogger.info(TAG, "Uploading ${uploadable.size} reading(s) — TransmitterId='$transmitterSerialNumber'")
@@ -223,16 +270,30 @@ class EversenseHttp365Util {
                 val responseCode = conn.responseCode
                 if (responseCode >= 400) {
                     val error = try { conn.errorStream?.readBytes()?.toString(Charsets.UTF_8) ?: "" } catch (e: Exception) { "" }
-                    EversenseLogger.error(TAG, "Glucose upload failed — status: $responseCode")
-                    false
+                    EversenseLogger.error(TAG, "Glucose upload failed — status: $responseCode, body: $error")
+                    UploadOutcome(
+                        success = false,
+                        sentCount = 0,
+                        skippedNoRawData = readings.size - uploadable.size,
+                        httpStatus = responseCode,
+                        responseBody = error
+                    )
                 } else {
                     val responseBody = try { conn.inputStream.readBytes().toString(Charsets.UTF_8) } catch (e: Exception) { "" }
-                    EversenseLogger.info(TAG, "Glucose upload success — status: $responseCode, readings: ${uploadable.size}")
-                    true
+                    EversenseLogger.info(TAG, "Glucose upload success — status: $responseCode, readings: ${uploadable.size}, body: $responseBody")
+                    // Carried out, but the body is what tells us whether the server actually kept
+                    // the reading - a 2xx alone has proven not to mean it landed in the portal.
+                    UploadOutcome(
+                        success = true,
+                        sentCount = uploadable.size,
+                        skippedNoRawData = readings.size - uploadable.size,
+                        httpStatus = responseCode,
+                        responseBody = responseBody
+                    )
                 }
             } catch (e: Exception) {
                 EversenseLogger.error(TAG, "Glucose upload exception: $e")
-                false
+                UploadOutcome(success = false, error = e.toString())
             }
         }
 
