@@ -580,9 +580,14 @@ class EversensePlugin @Inject constructor(
                     // (e.g. a disconnect mid-sync) retries within seconds, and toasting every
                     // failed attempt was spamming the user during sustained connection trouble.
 
+                    // Both calls below report the server's status and reply for the same reason the
+                    // glucose upload does: "✅ ok" said nothing about what the server did with the
+                    // request. putCurrentValues in particular is what drives "Last Sync Date" on
+                    // the portal, so a silent failure there is visible to the user before anything
+                    // in the log explains it.
                     val latest = readings.firstOrNull { it.rawResponseHex.isNotEmpty() } ?: readings.firstOrNull()
                     if (latest != null) {
-                        val portalOk = app.aaps.plugins.eversense.util.EversenseHttp365Util.putCurrentValues(
+                        val portalOutcome = app.aaps.plugins.eversense.util.EversenseHttp365Util.putCurrentValues(
                             preferences = prefs,
                             glucose = latest.glucoseInMgDl,
                             timestamp = latest.datetime,
@@ -590,19 +595,25 @@ class EversensePlugin @Inject constructor(
                             signalStrength = state.sensorSignalStrength,
                             batteryPercentage = state.batteryPercentage
                         )
-                        aapsLogger.info(LTag.BGSOURCE, "Eversense portal sync: ${if (portalOk) "✅ ok" else "❌ failed"}")
+                        aapsLogger.info(
+                            LTag.BGSOURCE,
+                            "Eversense portal sync: ${if (portalOutcome.success) "✅" else "❌ failed —"} ${portalOutcome.describe()}"
+                        )
                     }
 
                     val uploadableReadings = readings.filter { it.rawResponseHex.isNotEmpty() }
                     if (uploadableReadings.isNotEmpty()) {
-                        val eventsOk = app.aaps.plugins.eversense.util.EversenseHttp365Util.putDeviceEvents(
+                        val eventsOutcome = app.aaps.plugins.eversense.util.EversenseHttp365Util.putDeviceEvents(
                             preferences = prefs,
                             readings = uploadableReadings,
                             transmitterSerialNumber = state.transmitterSerialNumber,
                             calibrations = state.calibrationHistory.filter { it.datetime == state.lastCalibrationDate },
                             alerts = state.activeAlarms
                         )
-                        aapsLogger.info(LTag.BGSOURCE, "Eversense device events: ${if (eventsOk) "✅ ok" else "❌ failed"}")
+                        aapsLogger.info(
+                            LTag.BGSOURCE,
+                            "Eversense device events: ${if (eventsOutcome.success) "✅" else "❌ failed —"} ${eventsOutcome.describe()}"
+                        )
                     }
                 } else {
                     // E3 EU/OUS upload
