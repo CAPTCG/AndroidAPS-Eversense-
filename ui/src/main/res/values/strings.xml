@@ -344,5 +344,6 @@
     <string name="afrezza_carb_prompt_title">Enter Carbs?</string>
     <string name="afrezza_carb_prompt_message">Open the Bolus Calculator to enter carbs for this meal?</string>
     <string name="afrezza_no_profile">No active profile — cannot set temp basal</string>
+    <string name="automation_condition_not_met">Condition not met right now</string>
 
 </resources>

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import app.aaps.ui.R
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -57,7 +58,14 @@ data class SceneSheetItem(
 @Immutable
 data class ScenesUiState(
     val items: List<AutomationActionItem> = emptyList(),
-    val sceneItems: List<SceneSheetItem> = emptyList()
+    val sceneItems: List<SceneSheetItem> = emptyList(),
+    /**
+     * Whether automation actions are usable at all on this install - execution enabled and not
+     * delegated to the watch. Drives the home screen's Automation button independently of
+     * [items], so the button stays put instead of appearing and vanishing as rules become
+     * runnable.
+     */
+    val automationAvailable: Boolean = false
 )
 
 @HiltViewModel
@@ -153,11 +161,16 @@ class ScenesViewModel @Inject constructor(
 
             // Read directly from the flow's current snapshot — same source we already collect for
             // refresh triggers, so the displayed list matches the value that caused the refresh.
-            // (Previously called automation.userEvents() which re-snapshots independently and was
-            // also pre-filtering isEnabled — making the inline filter partly redundant.)
             // Automation executes on master only — a client never lists runnable user actions.
-            val items = if (watchOnly || !automation.executionEnabled) emptyList()
-            else automation.events.value.filter { it.userAction && it.isEnabled && it.canRun() }.map { event ->
+            //
+            // Every enabled rule is listed, not just those flagged userAction with a currently-true
+            // condition. Filtering on those made the list — and the home screen button with it —
+            // appear and disappear depending on whether a rule's condition happened to hold, which
+            // is not something a user can predict from the button. Rules that cannot run right now
+            // are shown disabled with the reason instead, the same treatment scenes already get.
+            val automationAvailable = !watchOnly && automation.executionEnabled
+            val items = if (!automationAvailable) emptyList()
+            else automation.events.value.filter { it.isEnabled }.map { event ->
                 AutomationActionItem(
                     eventId = event.id,
                     title = event.title,
@@ -165,11 +178,14 @@ class ScenesViewModel @Inject constructor(
                     actionsDescription = event.actionsDescription(),
                     triggerIcons = event.triggerIcons().toList(),
                     actionIcons = event.actionIcons().toList(),
+                    // A global blocker (master offline, loop paused, pump/profile not ready) applies
+                    // to everything; otherwise a rule is blocked only by its own condition.
                     activationReason = automationReason
+                        ?: if (event.canRun()) null else rh.gs(R.string.automation_condition_not_met)
                 )
             }
 
-            _uiState.update { it.copy(items = items, sceneItems = scenes) }
+            _uiState.update { it.copy(items = items, sceneItems = scenes, automationAvailable = automationAvailable) }
         }
     }
 

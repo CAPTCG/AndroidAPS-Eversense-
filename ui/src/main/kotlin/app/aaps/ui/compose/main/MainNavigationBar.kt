@@ -34,12 +34,16 @@ fun MainNavigationBar(
     onManageClick: () -> Unit,
     onTreatmentClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** On a client, hide the mutating nav buttons (Treatments + Scenes) until paired. Always true on master. */
+    /** On a client, hide the mutating nav buttons (Treatments + Automation) until paired. Always true on master. */
     masterOrPairedClient: Boolean = true,
     quickWizardCount: Int = 0,
     onAutomationClick: () -> Unit = {},
-    /** Total scenes + automation items defined — drives whether the nav button is shown at all. */
-    automationTotal: Int = 0,
+    /**
+     * Whether automation actions are usable on this install at all — drives whether the nav
+     * button is shown. Deliberately not derived from how many rules are currently runnable: a
+     * button that comes and goes as conditions change is not something a user can rely on.
+     */
+    automationAvailable: Boolean = false,
     /** Subset of [automationTotal] that the user can activate right now — drives the badge. */
     automationCount: Int = 0,
     pumpSetupPlugin: PluginBase? = null,
@@ -97,10 +101,15 @@ fun MainNavigationBar(
             )
         }
 
-        // Scenes/automation button — visible whenever scenes or automation items exist on a paired
-        // client (regardless of pump/loop/profile state). The badge counts only items the user can act
-        // on right now; gated items are visible inside the sheet, dimmed with reason.
-        if (masterOrPairedClient && automationTotal > 0) {
+        // Automation button — visible whenever automation is usable on this install, so it stays in
+        // a fixed position rather than appearing and disappearing with pump/loop/profile state or
+        // with whether any rule's condition currently holds. The badge counts only items the user
+        // can act on right now; the rest are listed inside the sheet, dimmed with a reason.
+        //
+        // Scenes deliberately do not appear here. They remain fully available under Manage → Scenes
+        // (SceneListScreen), which offers activate and deactivate, so this is a shortcut for
+        // automations only rather than a combined entry point.
+        if (masterOrPairedClient && automationAvailable) {
             NavigationBarItem(
                 selected = false,
                 onClick = onAutomationClick,
@@ -116,12 +125,12 @@ fun MainNavigationBar(
                     ) {
                         Icon(
                             imageVector = IcAutomation,
-                            contentDescription = stringResource(CoreUiR.string.scenes),
+                            contentDescription = stringResource(CoreUiR.string.automation),
                             modifier = Modifier.size(24.dp)
                         )
                     }
                 },
-                label = { Text(text = stringResource(CoreUiR.string.scenes)) },
+                label = { Text(text = stringResource(CoreUiR.string.automation)) },
                 colors = navColors
             )
         }

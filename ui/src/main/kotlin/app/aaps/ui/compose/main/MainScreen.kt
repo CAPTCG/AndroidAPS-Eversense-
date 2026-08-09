@@ -404,12 +404,12 @@ fun MainScreen(
                                 scenesViewModel.refreshState()
                                 showAutomationSheet = true
                             },
-                            // Total drives nav-button visibility (button stays visible whenever
-                            // scenes/automation exist, even if currently un-activatable).
-                            // Count drives the badge — only items the user can act on right now.
-                            automationTotal = automationState.items.size + automationState.sceneItems.size,
-                            automationCount = automationState.items.count { it.activationReason == null } +
-                                automationState.sceneItems.count { it.activationReason == null },
+                            // Availability drives nav-button visibility, so the button holds its
+                            // place whatever the rules currently say. Count drives the badge — only
+                            // items the user can act on right now; the rest are listed dimmed.
+                            // Scenes are excluded from both: they live under Manage → Scenes.
+                            automationAvailable = automationState.automationAvailable,
+                            automationCount = automationState.items.count { it.activationReason == null },
                             pumpSetupPlugin = pumpSetupPlugin,
                             bgSetupPlugin = bgSetupPlugin,
                             bgQualityBadgeIcon = bgQualityBadgeIcon,
@@ -482,14 +482,14 @@ fun MainScreen(
         )
     }
 
-    // Automation bottom sheet
+    // Automation bottom sheet. sceneItems/onSceneClick are deliberately not passed - the sheet
+    // defaults them to empty and skips its scenes section, so this shows automations only. Scenes
+    // remain fully available (activate and deactivate) under Manage → Scenes.
     if (showAutomationSheet) {
         ScenesBottomSheet(
             onDismiss = { showAutomationSheet = false },
             automationItems = automationState.items,
-            onItemClick = { item -> mainViewModel.requestAutomationConfirmation(item.eventId) },
-            sceneItems = automationState.sceneItems,
-            onSceneClick = { sceneId -> mainViewModel.requestSceneConfirmation(sceneId) }
+            onItemClick = { item -> mainViewModel.requestAutomationConfirmation(item.eventId) }
         )
     }
 
