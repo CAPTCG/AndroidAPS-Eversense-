@@ -2,6 +2,7 @@ package app.aaps.pump.omnipod.common.bledriver.comm.pair
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.utils.toHex
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.MessageIOException
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.PairingException
 import app.aaps.pump.omnipod.common.bledriver.pod.util.P256KeyGenerator
@@ -71,6 +72,13 @@ class O5KeyExchange(
         }
         podPublic = payload.copyOfRange(0, PUBLIC_KEY_SIZE)
         podNonce = payload.copyOfRange(PUBLIC_KEY_SIZE, PUBLIC_KEY_SIZE + NONCE_SIZE)
+        // Transcript inputs — all four of these are sent in the clear over BLE during SPS1,
+        // so logging them reveals nothing the air doesn't already carry, and they are what
+        // the SPS2 channel-binding signature is computed over.
+        aapsLogger.debug(LTag.PUMPBTCOMM, "pdmPublic (${pdmPublic.size}): ${pdmPublic.toHex()}")
+        aapsLogger.debug(LTag.PUMPBTCOMM, "podPublic (${podPublic.size}): ${podPublic.toHex()}")
+        aapsLogger.debug(LTag.PUMPBTCOMM, "pdmNonce (${pdmNonce.size}): ${pdmNonce.toHex()}")
+        aapsLogger.debug(LTag.PUMPBTCOMM, "podNonce (${podNonce.size}): ${podNonce.toHex()}")
         o5GenerateKeys()
     }
 
@@ -96,6 +104,9 @@ class O5KeyExchange(
         }
         conf = derivedKey.copyOfRange(0, 16)
         ltk = derivedKey.copyOfRange(16, 32)
+        // conf is logged (not ltk) so a failed pairing can be diffed against a working
+        // OmnipodKit capture — it is a per-attempt key for a session that never completed.
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Derived conf (${conf.size}): ${conf.toHex()}, ltk ${ltk.size} bytes")
     }
 
     /**

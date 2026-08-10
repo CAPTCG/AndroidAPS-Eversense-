@@ -2,6 +2,7 @@ package app.aaps.pump.omnipod.common.bledriver.comm.pair
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.utils.toHex
 import app.aaps.pump.omnipod.common.bledriver.comm.Id
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.PairingException
 import app.aaps.pump.omnipod.common.bledriver.comm.interfaces.scan.PodScanner
@@ -218,23 +219,38 @@ class O5LTKExchanger(
         val certDER = certStore.registration.intermediateCA
             ?: throw PairingException("SPS2.1: intermediate CA certificate DER is null")
 
+        aapsLogger.debug(LTag.PUMPBTCOMM, "=== SPS2.1 PHASE START ===")
+        aapsLogger.debug(LTag.PUMPBTCOMM, "SPS2.1: using cert (${certDER.size} bytes, cert-only short path)")
+
         val nonce = keyExchange.getSPSNonce(O5KeyExchange.Direction.WRITE)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "Encrypting SPS2.1: key=${keyExchange.conf.toHex()}, nonce=${nonce.toHex()}, plaintext=${certDER.size} bytes"
+        )
         val encrypted = aesCcmEncrypt(keyExchange.conf, nonce, certDER)
         keyExchange.incrementNonce(O5KeyExchange.Direction.WRITE)
+        aapsLogger.debug(LTag.PUMPBTCOMM, "SPS2.1 encrypted: ${encrypted.size} bytes (target=${certDER.size + MAC_SIZE_BYTES})")
         return encrypted
     }
 
     /** Decrypts and validates the pod's SPS2.1 response (short path: cert only). */
     private fun o5ValidatePodSps2_1(msg: MessagePacket) {
         val payload = parseKeys(arrayOf(SPS2_1), msg.payload)[0]
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Received pod SPS2.1: ${payload.size} bytes")
 
         val nonce = keyExchange.getSPSNonce(O5KeyExchange.Direction.READ)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "Decrypting pod SPS2.1: key=${keyExchange.conf.toHex()}, nonce=${nonce.toHex()}, ciphertext=${payload.size} bytes"
+        )
         val podCertDER = aesCcmDecrypt(keyExchange.conf, nonce, payload)
         keyExchange.incrementNonce(O5KeyExchange.Direction.READ)
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Pod SPS2.1 decrypted: ${podCertDER.size} bytes (pod cert DER, short path)")
 
         if (O5CertificateStore.extractP256PublicKey(podCertDER) == null) {
             aapsLogger.error(LTag.PUMPBTCOMM, "Failed to extract P-256 public key from pod SPS2.1 certificate DER")
         }
+        aapsLogger.debug(LTag.PUMPBTCOMM, "=== SPS2.1 PHASE COMPLETE ===")
     }
 
     // -- SPS2 (certificate confirmation, extended path: cert + ECDSA signature) -----------
@@ -248,13 +264,31 @@ class O5LTKExchanger(
         val certDER = certStore.registration.tlsCertificate
             ?: throw PairingException("SPS2: TLS certificate DER is null")
 
+        aapsLogger.debug(LTag.PUMPBTCOMM, "=== SPS2 PHASE START ===")
+
         val transcript = keyExchange.buildChannelBindingTranscript()
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Channel-binding transcript (${transcript.size} bytes): ${transcript.toHex()}")
+
         val signatureRaw = certStore.signRaw(transcript)
+        aapsLogger.debug(LTag.PUMPBTCOMM, "ECDSA signature (${signatureRaw.size} bytes): ${signatureRaw.toHex()}")
+
         val plaintext = certDER + signatureRaw
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "SPS2: TLS cert (${certDER.size} bytes) + sig (${signatureRaw.size}) = ${plaintext.size} plaintext"
+        )
 
         val nonce = keyExchange.getSPSNonce(O5KeyExchange.Direction.WRITE)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "Encrypting SPS2: key=${keyExchange.conf.toHex()}, nonce=${nonce.toHex()}, plaintext=${plaintext.size} bytes"
+        )
         val encrypted = aesCcmEncrypt(keyExchange.conf, nonce, plaintext)
         keyExchange.incrementNonce(O5KeyExchange.Direction.WRITE)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "SPS2 encrypted: ${encrypted.size} bytes (target=${certDER.size + signatureRaw.size + MAC_SIZE_BYTES})"
+        )
         return encrypted
     }
 
@@ -266,8 +300,13 @@ class O5LTKExchanger(
      */
     private fun o5ValidatePodSps2(msg: MessagePacket) {
         val payload = parseKeys(arrayOf(SPS2), msg.payload)[0]
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Received pod SPS2: ${payload.size} bytes")
 
         val nonce = keyExchange.getSPSNonce(O5KeyExchange.Direction.READ)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "Decrypting pod SPS2: key=${keyExchange.conf.toHex()}, nonce=${nonce.toHex()}, ciphertext=${payload.size} bytes"
+        )
         val decrypted = aesCcmDecrypt(keyExchange.conf, nonce, payload)
         keyExchange.incrementNonce(O5KeyExchange.Direction.READ)
 
@@ -277,10 +316,16 @@ class O5LTKExchanger(
         val certLen = decrypted.size - 64
         val podCertDER = decrypted.copyOfRange(0, certLen)
         val podSignature = decrypted.copyOfRange(certLen, decrypted.size)
+        aapsLogger.debug(
+            LTag.PUMPBTCOMM,
+            "Pod SPS2 decrypted: ${decrypted.size} bytes (cert_DER=$certLen + sig=${podSignature.size})"
+        )
+        aapsLogger.debug(LTag.PUMPBTCOMM, "Pod signature (${podSignature.size} bytes): ${podSignature.toHex()}")
 
         val podPubKeyRaw = O5CertificateStore.extractP256PublicKey(podCertDER)
         if (podPubKeyRaw != null) {
             val transcript = keyExchange.buildPodChannelBindingTranscript()
+            aapsLogger.debug(LTag.PUMPBTCOMM, "Pod channel-binding transcript (${transcript.size} bytes): ${transcript.toHex()}")
             val valid = O5CertificateStore.verifySignature(podSignature, transcript, podPubKeyRaw)
             if (valid) {
                 aapsLogger.debug(LTag.PUMPBTCOMM, "Pod SPS2 signature verification PASSED")
@@ -290,6 +335,7 @@ class O5LTKExchanger(
         } else {
             aapsLogger.error(LTag.PUMPBTCOMM, "Failed to extract P-256 public key from pod SPS2 certificate DER")
         }
+        aapsLogger.debug(LTag.PUMPBTCOMM, "=== SPS2 PHASE COMPLETE ===")
     }
 
     // -- P0 --------------------------------------------------------------------------------
