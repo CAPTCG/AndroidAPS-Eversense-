@@ -8,6 +8,7 @@ import app.aaps.shared.tests.AAPSLoggerTest
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.spy
 import org.mockito.kotlin.whenever
@@ -172,5 +173,94 @@ class O5KeyExchangeTest {
         assertThat(transcript[0]).isEqualTo(0x02.toByte())
         val podNonceAdjustedInTranscript = transcript.copyOfRange(139, 155)
         assertThat(podNonceAdjustedInTranscript).isEqualTo(originalPodNonce)
+    }
+
+    // -- Golden vector from a real, successful O5 pairing ---------------------------------
+    //
+    // Captured 2026-08-12 from OmnipodKit (Trio on iOS) completing SPS2 against a real pod -
+    // the exchange this Kotlin port is dropped at. These are the actual bytes OmnipodKit put
+    // on the wire, so unlike the structural tests above, this pins the transcript and SPS
+    // nonces to a known-accepted reference rather than to our own reading of the Swift.
+    //
+    // Only pdmPublic/podPublic/pdmNonce/podNonce feed the transcript and the SPS nonces, and
+    // all four are recoverable from that capture. The ephemeral private key is not, so conf/
+    // ltk cannot be reproduced here - but they don't affect either value under test.
+
+    private object TrioCapture {
+
+        /** Controller ephemeral public key (from the logged transcript). */
+        const val PDM_PUBLIC =
+            "84dbaf14bb1d7155fbe077a84bafa8dbcbda86be6a3c2c6c57d4913a5bc77512" +
+                "24a6362163c46b61d21d5085cf9e5df3721abe734de867483928b973abf8406b"
+
+        /** Pod ephemeral public key + nonce, exactly as received in the pod's SPS1 reply. */
+        const val POD_SPS1_PAYLOAD =
+            "bc207ee6cc8ac3f9ab1a59f209b8f595c424f56e0077e469e2161a267eee2443" +
+                "5c33aaf5398ebdac04c93e15ca08d7006c2a2f50e806cb33400be879e103eb6f" +
+                "c1d022a08a9feabafcb941a483963255"
+
+        /** Controller nonce as first generated, before any increment. */
+        const val PDM_NONCE = "5a60f0c9af60befebed4c8272a47b8d9"
+
+        /** AES-CCM nonces logged by OmnipodKit at each SPS2.1/SPS2 step. */
+        const val NONCE_SPS2_1_WRITE = "015a60f0c9af60c1d022a08a9f"
+        const val NONCE_SPS2_1_READ = "02c1d022a08a9f5b60f0c9af60"
+        const val NONCE_SPS2_WRITE = "015b60f0c9af60c2d022a08a9f"
+        const val NONCE_SPS2_READ = "02c2d022a08a9f5c60f0c9af60"
+
+        /** The 171-byte transcript OmnipodKit signed, and the pod accepted. */
+        const val TRANSCRIPT =
+            "019b0ab96a76f40000000084dbaf14bb1d7155fbe077a84bafa8dbcbda86be6a" +
+                "3c2c6c57d4913a5bc7751224a6362163c46b61d21d5085cf9e5df3721abe734d" +
+                "e867483928b973abf8406bbc207ee6cc8ac3f9ab1a59f209b8f595c424f56e00" +
+                "77e469e2161a267eee24435c33aaf5398ebdac04c93e15ca08d7006c2a2f50e8" +
+                "06cb33400be879e103eb6f5b60f0c9af60befebed4c8272a47b8d9c2d022a08a" +
+                "9feabafcb941a483963255"
+    }
+
+    private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+    private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
+
+    /**
+     * Builds an exchange whose controller-side material is the captured session's, so the
+     * transcript and SPS nonces are reproducible. The private key stays real (a stub would
+     * fail ECDH's curve validation against the pod's genuine public key); it only affects
+     * the shared secret, which neither value under test depends on.
+     */
+    private fun trioCaptureExchange(): O5KeyExchange {
+        val keyGenerator = spy(P256KeyGenerator())
+        doReturn(hex(TrioCapture.PDM_PUBLIC)).whenever(keyGenerator).publicFromPrivate(any())
+        val randomByteGenerator = spy(RandomByteGenerator())
+        doReturn(hex(TrioCapture.PDM_NONCE)).whenever(randomByteGenerator).nextBytes(any())
+        return O5KeyExchange(aapsLogger, keyGenerator, randomByteGenerator, controllerIdData)
+            .apply { o5UpdatePodPublicData(hex(TrioCapture.POD_SPS1_PAYLOAD)) }
+    }
+
+    @Test
+    fun `channel-binding transcript matches a real pairing the pod accepted`() {
+        val ke = trioCaptureExchange()
+
+        // Walk the same sequence O5LTKExchanger does: send SPS2.1 (WRITE +1), read the pod's
+        // SPS2.1 (READ +1), then build the transcript. Both nonces are one step on by then.
+        ke.incrementNonce(O5KeyExchange.Direction.WRITE)
+        ke.incrementNonce(O5KeyExchange.Direction.READ)
+
+        assertThat(ke.buildChannelBindingTranscript().hex()).isEqualTo(TrioCapture.TRANSCRIPT)
+    }
+
+    @Test
+    fun `SPS nonces match the real pairing at every step`() {
+        val ke = trioCaptureExchange()
+
+        // SPS2.1: encrypt ours, then decrypt the pod's - each followed by its own increment.
+        assertThat(ke.getSPSNonce(O5KeyExchange.Direction.WRITE).hex()).isEqualTo(TrioCapture.NONCE_SPS2_1_WRITE)
+        ke.incrementNonce(O5KeyExchange.Direction.WRITE)
+        assertThat(ke.getSPSNonce(O5KeyExchange.Direction.READ).hex()).isEqualTo(TrioCapture.NONCE_SPS2_1_READ)
+        ke.incrementNonce(O5KeyExchange.Direction.READ)
+
+        // SPS2: same again, one step further on.
+        assertThat(ke.getSPSNonce(O5KeyExchange.Direction.WRITE).hex()).isEqualTo(TrioCapture.NONCE_SPS2_WRITE)
+        ke.incrementNonce(O5KeyExchange.Direction.WRITE)
+        assertThat(ke.getSPSNonce(O5KeyExchange.Direction.READ).hex()).isEqualTo(TrioCapture.NONCE_SPS2_READ)
     }
 }
