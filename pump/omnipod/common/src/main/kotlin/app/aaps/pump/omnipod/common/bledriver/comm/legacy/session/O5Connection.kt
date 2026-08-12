@@ -26,6 +26,7 @@ import app.aaps.pump.omnipod.common.bledriver.comm.legacy.io.CmdBleIO
 import app.aaps.pump.omnipod.common.bledriver.comm.legacy.io.DataBleIO
 import app.aaps.pump.omnipod.common.bledriver.comm.legacy.io.IncomingPackets
 import app.aaps.pump.omnipod.common.bledriver.comm.message.MessageIO
+import app.aaps.pump.omnipod.common.bledriver.comm.packet.BlePacketLayout
 import app.aaps.pump.omnipod.common.bledriver.comm.pair.O5CertificateStore
 import app.aaps.pump.omnipod.common.bledriver.comm.session.Connected
 import app.aaps.pump.omnipod.common.bledriver.comm.session.ConnectionState
@@ -116,29 +117,25 @@ class O5Connection(
         }
         podState.bluetoothConnectionState = O5PodStateManager.BluetoothConnectionState.CONNECTED
 
-        // Deliberately NOT requesting a larger ATT MTU here - stay at the 23-byte default.
-        //
-        // This used to call requestMtu(244 + 3), on the reasoning that CoreBluetooth negotiates
-        // the MTU automatically and Android has to ask. A capture of a *successful* iOS pairing
-        // (OmnipodKit via Trio, 2026-08-12) shows that is not what happens: the pod peripheral
-        // stays at "mtu = 23" for the entire exchange, including the 959-byte SPS2 message.
-        //
-        // The MTU is not just a size limit, it selects the ATT operation. At MTU 23 a 244-byte
-        // characteristic write becomes a long write (Prepare Write / Execute Write in 20-byte
-        // chunks), which is what the pod sees from iOS and from a real PDM. At MTU 247 the same
-        // bytes go out as a single Write Request. Requesting the larger MTU therefore changed
-        // the wire protocol on every write, while looking like a harmless optimisation.
-        //
-        // That is the one difference found between our failing SPS2 and OmnipodKit's working
-        // one - everything above the transport matches byte for byte (transcript layout and
-        // contents, KDF input, nonce timing, certificate sizes, message sizes and sequence
-        // numbers). Android performs the long write itself once the payload exceeds MTU-3, so
-        // no fragmentation change is needed here; BlePacketLayout.OMNIPOD_5 keeps its 244-byte
-        // payload to stay aligned with OmnipodKit's BlePodProfile.
-        //
-        // BleCommCallbacks.waitForMtuChange/negotiatedMtu are intentionally left in place: the
-        // onMtuChanged callback still fires if the peer initiates, and keeping the mechanism
-        // means restoring the request is a one-line change if this turns out to be wrong.
+        // Unlike iOS's CoreBluetooth (which negotiates the ATT MTU automatically), Android
+        // stays at the default 23-byte MTU (20 usable payload bytes) until the app explicitly
+        // requests more - and O5's packet layout allows payloads up to 244 bytes (see
+        // BlePacketLayout.OMNIPOD_5), so without this, any O5 message needing more than one
+        // ~18-byte fragment would get silently truncated on the wire. Dash doesn't need this:
+        // its 20-byte packets already fit the un-negotiated default.
+        val requestedMtu = BlePacketLayout.OMNIPOD_5.maxPayloadSize + ATT_HEADER_SIZE
+        if (!gatt.requestMtu(requestedMtu)) {
+            throw FailedToConnectException("requestMtu($requestedMtu) returned false")
+        }
+        if (!bleCommCallbacks.waitForMtuChange(MTU_NEGOTIATION_TIMEOUT_MS)) {
+            throw FailedToConnectException("Timed out waiting for MTU negotiation")
+        }
+        if (bleCommCallbacks.negotiatedMtu < requestedMtu) {
+            aapsLogger.warn(
+                LTag.PUMPBTCOMM,
+                "Pod granted a smaller MTU than requested (O5): ${bleCommCallbacks.negotiatedMtu} < $requestedMtu"
+            )
+        }
 
         val discoverer = ServiceDiscoverer(aapsLogger, gatt, bleCommCallbacks, this)
         val discovered = discoverer.discoverServices(connectionWaitCond, PodType.OMNIPOD_5)
@@ -327,6 +324,10 @@ class O5Connection(
         const val MIN_DISCOVERY_TIMEOUT_MS = 10000L
         const val MAX_WAIT_FOR_CONNECTION_SECONDS = Constants.PUMP_MAX_CONNECTION_TIME_IN_SECONDS + 10
         const val SLEEP_WHEN_FAILING_TO_CONNECT_GATT = 10000L
+
+        /** BLE ATT opcode (1 byte) + attribute handle (2 bytes) overhead per spec. */
+        private const val ATT_HEADER_SIZE = 3
+        private const val MTU_NEGOTIATION_TIMEOUT_MS = 5000L
 
         /** Standard Client Characteristic Configuration Descriptor UUID (BLE spec). */
         private val CLIENT_CHARACTERISTIC_CONFIG_UUID: UUID =
