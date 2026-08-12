@@ -160,9 +160,25 @@ matches, and the content layer is now confirmed by replay rather than by inspect
 That narrows the remaining search to the path between constructing the SPS2 payload and
 it arriving at the pod: the AES-CCM ciphertext itself (its key and nonce inputs are
 confirmed, the encryption step is not), packet fragmentation and reassembly, and the GATT
-write mechanics. Instrumenting the Android side to log the transcript, signature and
-ciphertext at the moment of failure remains the way to close that gap — if those bytes
-match the reference, the fault is purely in delivery.
+write mechanics.
+
+### Current step: comparing the actual BLE writes
+
+The Android side's per-packet writes are already captured in full hex, from a logcat trace
+taken during a failing attempt. The equivalent view from the working implementation is not,
+because OmnipodKit's per-packet logging (`bleDebug`) is compiled off by default.
+
+Enabling it and capturing one successful pairing supplies the missing half. That costs
+nothing — the pod pairs normally and stays in use — and yields two things:
+
+- `maximumWriteValueLength settled after N polls: maximumWriteValueLength=…`, which
+  settles the MTU question with a measured value rather than an inference from the stale
+  connect-time field described above
+- `[sendMessagePacket]` detail, allowing the two implementations' writes to be diffed
+  directly
+
+If those writes match, the entire byte path is identical end to end and the fault lies in
+GATT mechanics or timing. If they differ, the difference names the bug.
 
 If anyone has a BLE sniffer capture of a real PDM or the Omnipod 5 app performing SPS2,
 that would settle it faster than anything else — no such capture appears to be publicly
