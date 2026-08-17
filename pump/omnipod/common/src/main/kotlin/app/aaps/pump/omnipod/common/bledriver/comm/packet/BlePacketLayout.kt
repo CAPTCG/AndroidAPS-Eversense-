@@ -3,14 +3,6 @@ package app.aaps.pump.omnipod.common.bledriver.comm.packet
 import app.aaps.pump.omnipod.common.bledriver.pod.definition.PodType
 
 /**
- * BLE packet framing parameters. Dash and Omnipod 5 share the same header byte layout but
- * use different maximum payload sizes per packet (Dash: 20 bytes, O5: 244 bytes), which in
- * turn changes every derived fragment capacity used when splitting/joining message payloads.
- *
- * Ported from OmnipodKit's BlePodProfile.swift (loopandlearn/OmnipodKit) `BlePacketLayout`
- * struct and its `omnipodDash`/`omnipod5` presets.
- */
-/**
  * How far each outgoing BLE packet is zero-filled.
  *
  * OmnipodKit's BLEPacket.swift has no such switch - it pads per packet type, unconditionally:
@@ -53,6 +45,14 @@ enum class PacketPadding {
     TAIL_PACKET_ONLY
 }
 
+/**
+ * BLE packet framing parameters. Dash and Omnipod 5 share the same header byte layout but
+ * use different maximum payload sizes per packet (Dash: 20 bytes, O5: 244 bytes), which in
+ * turn changes every derived fragment capacity used when splitting/joining message payloads.
+ *
+ * Ported from OmnipodKit's BlePodProfile.swift (loopandlearn/OmnipodKit) `BlePacketLayout`
+ * struct and its `omnipodDash`/`omnipod5` presets.
+ */
 data class BlePacketLayout(
     val maxPayloadSize: Int,
     val maxFragments: Int,
