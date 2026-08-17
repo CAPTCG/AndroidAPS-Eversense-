@@ -152,13 +152,14 @@ class PayloadSplitterJoinerTest : TestBase() {
         assertThat(parsed.payload).isEqualTo(payload)
     }
 
-    // -- padToMaxPayloadSize: O5 must write exact-length packets like OmnipodKit does ------
-    // See BlePacketLayout.padToMaxPayloadSize's doc comment for why Dash keeps padding.
+    // -- Packet padding: O5 pads tail packets only, Dash pads everything ------------------
+    // Sizes below are the observed BLE writes from a Trio pairing that succeeded against a
+    // real pod on 2026-08-17. See PacketPadding's doc comment.
 
     @Test
-    fun `O5 packets are written at their exact length, not padded to the 244-byte MTU`() {
-        // 44 bytes is the real size of the SP1+SP2 pairing message seen in device logs; it
-        // was going out as a 244-byte BLE write with 193 bytes of zero padding.
+    fun `O5 single-packet messages are written at their exact length, not padded to 244`() {
+        // 44 bytes is the real size of the SP1+SP2 pairing message. A single-packet message
+        // is a FirstBlePacket, which OmnipodKit never pads - Trio wrote 51 bytes here.
         val payload = payloadOf(44, seed = 7)
 
         val packets = PayloadSplitter(payload, BlePacketLayout.OMNIPOD_5).splitInPackets()
@@ -169,19 +170,33 @@ class PayloadSplitterJoinerTest : TestBase() {
     }
 
     @Test
-    fun `O5 multi-packet messages pad no packet, including the last`() {
-        // ~642 bytes is the SPS2.1 certificate message - the multi-packet path, which has
-        // never yet run against real hardware.
-        val payload = payloadOf(642, seed = 8)
+    fun `O5 split messages pad the tail packet, so every write is a full 244 bytes`() {
+        // The SPS2 message - the largest of the pairing sequence, and the one AAPS died on
+        // while sending a 10-byte tail packet where Trio sent 244.
+        val payload = payloadOf(959, seed = 8)
 
         val packets = PayloadSplitter(payload, BlePacketLayout.OMNIPOD_5).splitInPackets()
         val encoded = packets.map { it.toByteArray(BlePacketLayout.OMNIPOD_5) }
 
-        // Every packet except the last is inherently full; the last must NOT be padded out.
-        assertThat(encoded.last().size).isLessThan(BlePacketLayout.OMNIPOD_5.maxPayloadSize)
-        // Total bytes on the wire = all headers + exactly the payload, nothing more.
-        val headerBytes = encoded.size * 1 + 1 + 4 + 1 // per-packet index + fragments + crc32 + size
-        assertThat(encoded.sumOf { it.size }).isEqualTo(payload.size + headerBytes)
+        // Trio's writes for a payload this size were [244, 244, 244, 244, 244].
+        assertThat(encoded.map { it.size })
+            .isEqualTo(List(encoded.size) { BlePacketLayout.OMNIPOD_5.maxPayloadSize })
+        // Padding is trailing zeros only - the message still round-trips byte-for-byte.
+        assertThat(roundTrip(payload, BlePacketLayout.OMNIPOD_5)).isEqualTo(payload)
+    }
+
+    @Test
+    fun `O5 tail padding is zero-filled and does not disturb the payload`() {
+        val payload = payloadOf(500, seed = 11)
+
+        val encoded = PayloadSplitter(payload, BlePacketLayout.OMNIPOD_5)
+            .splitInPackets().map { it.toByteArray(BlePacketLayout.OMNIPOD_5) }
+
+        // The tail packet declares its real length in its size byte; everything past that
+        // header + length must be zeros, never stale or truncated payload.
+        val tail = encoded.last()
+        val declared = tail[1].toUnsignedInt()
+        assertThat(tail.drop(6 + declared).toByteArray()).isEqualTo(ByteArray(tail.size - 6 - declared))
         assertThat(roundTrip(payload, BlePacketLayout.OMNIPOD_5)).isEqualTo(payload)
     }
 
@@ -193,6 +208,21 @@ class PayloadSplitterJoinerTest : TestBase() {
             .splitInPackets().single().toByteArray(BlePacketLayout.DASH)
 
         assertThat(encoded.size).isEqualTo(BlePacketLayout.DASH.maxPayloadSize)
+    }
+
+    @Test
+    fun `Dash split messages still pad every packet, unchanged by the O5 padding fix`() {
+        // Dash's padding predates the O5 work and is proven against real hardware over years.
+        // The O5 fix must not have altered it on any packet type, split messages included.
+        val payload = payloadOf(120, seed = 10)
+
+        val encoded = PayloadSplitter(payload, BlePacketLayout.DASH)
+            .splitInPackets().map { it.toByteArray(BlePacketLayout.DASH) }
+
+        assertThat(encoded.size).isGreaterThan(1)
+        assertThat(encoded.map { it.size })
+            .isEqualTo(List(encoded.size) { BlePacketLayout.DASH.maxPayloadSize })
+        assertThat(roundTrip(payload, BlePacketLayout.DASH)).isEqualTo(payload)
     }
 
     @Test

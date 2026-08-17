@@ -31,7 +31,11 @@ data class FirstBlePacket(
         bb.put(payload)
 
         val pos = bb.position()
-        val ret = ByteArray(if (layout.padToMaxPayloadSize) layout.maxPayloadSize else pos)
+        // Not a tail packet, so it is padded only under ALL_PACKETS (Dash). Under
+        // TAIL_PACKET_ONLY this goes out at its exact length - which for a message that
+        // needs middle packets is already maxPayloadSize, since the split fills it, and for
+        // a single-packet message is deliberately short (SP1+SP2 = 51 bytes on the wire).
+        val ret = ByteArray(if (layout.packetPadding == PacketPadding.ALL_PACKETS) layout.maxPayloadSize else pos)
         bb.flip()
         bb.get(ret, 0, pos)
 
@@ -120,7 +124,11 @@ data class LastBlePacket(
             .putInt(crc32.toInt())
             .put(payload)
         val pos = bb.position()
-        val ret = ByteArray(if (layout.padToMaxPayloadSize) layout.maxPayloadSize else pos)
+        // A tail packet: always zero-filled to maxPayloadSize, under both padding
+        // modes. BLEPacket.swift's LastBlePacket.toData does this unconditionally
+        // (`Data(count: maxPayloadSize - payload.count - lastPacketHeaderSize)`), and the
+        // receiver takes the payload length from the header's size byte, not the write length.
+        val ret = ByteArray(layout.maxPayloadSize)
         bb.flip()
         bb.get(ret, 0, pos)
         return ret
@@ -157,8 +165,10 @@ data class LastOptionalPlusOneBlePacket(
 ) : BlePacket() {
 
     override fun toByteArray(layout: BlePacketLayout): ByteArray {
+        // Also a tail packet - padded under both modes, matching
+        // LastOptionalPlusOneBlePacket.toData in BLEPacket.swift.
         val exact = byteArrayOf(index, size) + payload
-        return if (layout.padToMaxPayloadSize) exact + ByteArray(layout.maxPayloadSize - exact.size) else exact
+        return exact + ByteArray(layout.maxPayloadSize - exact.size)
     }
 
     companion object {
