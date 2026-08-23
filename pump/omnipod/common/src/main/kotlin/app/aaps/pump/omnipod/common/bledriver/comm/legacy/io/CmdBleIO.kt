@@ -37,7 +37,21 @@ class CmdBleIO(
         return incomingPackets.peek()
     }
 
-    override fun hello() = sendAndConfirmPacket(BleCommandHello(OmnipodDashBleManagerImpl.CONTROLLER_ID).data)
+    override fun hello() = hello(OmnipodDashBleManagerImpl.CONTROLLER_ID)
+
+    /**
+     * Announces [controllerId] in the CMD 'hello' handshake, instead of Dash's hardcoded
+     * [OmnipodDashBleManagerImpl.CONTROLLER_ID].
+     *
+     * O5 identifies with the certificate-derived controller id from the imported credentials,
+     * and the id announced here has to be that same one. OmnipodKit threads a single `myId`
+     * through `sendHello(myId:)`, the pairing `Ids`, and `O5CertificateStore(controllerId:)` -
+     * it has no separate constant for this handshake - and a successful real-pod capture shows
+     * it announcing that id (`myId 0x2A098C`).
+     *
+     * The no-arg [hello] keeps the Dash id, which is correct for Dash.
+     */
+    fun hello(controllerId: Int) = sendAndConfirmPacket(BleCommandHello(controllerId).data)
 
     // OmnipodKit's PeripheralManager.waitForCommand(): the pod can send an intermediate
     // PAIR_STATUS command on this same characteristic while it's still preparing the

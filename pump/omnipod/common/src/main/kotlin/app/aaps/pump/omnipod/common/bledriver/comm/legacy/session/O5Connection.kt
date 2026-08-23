@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.utils.toHex
 import app.aaps.pump.omnipod.common.bledriver.comm.Ids
+import app.aaps.pump.omnipod.common.bledriver.comm.OmnipodDashBleManagerImpl
 import app.aaps.pump.omnipod.common.bledriver.comm.endecrypt.EnDecrypt
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.ConnectException
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.FailedToConnectException
@@ -64,7 +65,14 @@ class O5Connection(
     private val config: Config,
     private val context: Context,
     private val podState: O5PodStateManager,
-    private val p256KeyGenerator: P256KeyGenerator
+    private val p256KeyGenerator: P256KeyGenerator,
+    /**
+     * The controller id to announce in the 'hello' handshake while pairing a NEW pod, where it
+     * is already known from the picked credentials but not yet in [podState] (that only happens
+     * once pairing succeeds). Null for reconnects to an already-paired pod, which resolve it
+     * from [O5PodStateManager.controllerId].
+     */
+    private val pairingControllerId: Long? = null
 ) : BleConnection, DisconnectHandler {
 
     private val incomingPackets = IncomingPackets()
@@ -167,10 +175,33 @@ class O5Connection(
             CharacteristicType.DATA_O5
         )
         msgIO = MessageIO(aapsLogger, cmdBleIO, dataBleIO, PodType.OMNIPOD_5)
-        cmdBleIO.hello()
+        cmdBleIO.hello(helloControllerId())
         cmdBleIO.readyToRead()
         dataBleIO.readyToRead()
         _connectionWaitCond = null
+    }
+
+    /**
+     * Resolves the controller id for the 'hello' handshake: the pairing-time id when activating a
+     * new pod, otherwise the stored one for an already-paired pod.
+     *
+     * Falls back to Dash's [OmnipodDashBleManagerImpl.CONTROLLER_ID] only when neither is known,
+     * which is the behaviour this connection had unconditionally before - so a fallback can never
+     * be worse than before, but it does mean the pod is told an id that no O5 pairing message
+     * will use, hence the warning.
+     */
+    private fun helloControllerId(): Int {
+        val id = pairingControllerId ?: podState.controllerId
+        if (id == null) {
+            aapsLogger.warn(
+                LTag.PUMPBTCOMM,
+                "O5 hello: no controller id known (not pairing, and none stored) - falling back to the Dash id"
+            )
+            return OmnipodDashBleManagerImpl.CONTROLLER_ID
+        }
+        // controllerId is a 32-bit value carried in a Long to dodge unsigned-overflow pitfalls;
+        // BleCommandHello takes the Int the wire format actually uses.
+        return (id and 0xFFFFFFFFL).toInt()
     }
 
     @Synchronized

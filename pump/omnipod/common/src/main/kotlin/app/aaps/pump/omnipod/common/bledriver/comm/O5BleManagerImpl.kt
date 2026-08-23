@@ -287,7 +287,10 @@ class O5BleManagerImpl @Inject constructor(
             podState.bluetoothAddress = discovered.address
 
             emitter.onNext(PodEvent.BluetoothConnecting)
-            val conn = bleConnectionFactory.createConnection(discovered.address)
+            // Pass the id we just picked, so the 'hello' handshake announces the same controller
+            // id the pairing messages below use. It is not in podState yet - that only
+            // happens once pairing succeeds.
+            val conn = bleConnectionFactory.createConnection(discovered.address, controllerId)
             connection = conn
             conn.connect(ConnectionWaitCondition(timeoutMs = BleConnection.DEFAULT_CONNECT_TIMEOUT_MS))
             emitter.onNext(PodEvent.BluetoothConnected(discovered.address))

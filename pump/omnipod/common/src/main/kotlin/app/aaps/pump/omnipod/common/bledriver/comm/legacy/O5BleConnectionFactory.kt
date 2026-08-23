@@ -31,9 +31,18 @@ class O5BleConnectionFactory @Inject constructor(
     private val bluetoothAdapter: BluetoothAdapter?
         get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager?)?.adapter
 
-    override fun createConnection(podAddress: String): BleConnection {
+    override fun createConnection(podAddress: String): BleConnection = createConnection(podAddress, null)
+
+    /**
+     * Creates a connection that announces [controllerId] in the 'hello' handshake.
+     *
+     * Used when activating a NEW pod, where the id is known from the picked credentials but is
+     * not yet stored in [podState]. Pass null (or use the [BleConnectionFactory] method) to
+     * reconnect to an already-paired pod, which resolves the id from state.
+     */
+    fun createConnection(podAddress: String, controllerId: Long?): BleConnection {
         val adapter = bluetoothAdapter ?: throw ConnectException("Bluetooth not available")
         val podDevice = adapter.getRemoteDevice(podAddress)
-        return O5Connection(podDevice, aapsLogger, config, context, podState, p256KeyGenerator)
+        return O5Connection(podDevice, aapsLogger, config, context, podState, p256KeyGenerator, controllerId)
     }
 }
