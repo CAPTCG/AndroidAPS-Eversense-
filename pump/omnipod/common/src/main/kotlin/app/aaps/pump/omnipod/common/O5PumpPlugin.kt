@@ -28,6 +28,7 @@ import app.aaps.core.interfaces.protection.ProtectionCheck
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.queue.CustomCommand
 import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.core.interfaces.rx.collectResilient
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.ui.compose.icons.IcPluginOmnipod
 import app.aaps.pump.omnipod.common.bledriver.comm.O5BleManager
@@ -75,9 +76,15 @@ import app.aaps.pump.omnipod.common.ui.compose.OmnipodO5ComposeContent
 import app.aaps.pump.omnipod.common.util.mapProfileToBasalProgram
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Single
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.rx3.rxCompletable
 import org.json.JSONObject
@@ -141,6 +148,9 @@ class O5PumpPlugin @Inject constructor(
     aapsLogger, rh, preferences, commandQueue
 ), Pump {
 
+    /** Scopes the alert-preference observer started in [onStart]; cancelled in [onStop]. */
+    private var scope: CoroutineScope? = null
+
     @Volatile private var bolusCanceled = false
     @Volatile private var bolusDeliveryInProgress = false
     @Volatile private var stopConnecting: CountDownLatch? = null
@@ -177,11 +187,28 @@ class O5PumpPlugin @Inject constructor(
     override suspend fun onStart() {
         super.onStart()
         handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
+        val newScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope = newScope
+        // Push the pod's alert configuration as soon as any alert preference changes. Without
+        // this nothing ever raises CommandUpdateAlertConfiguration, so edits to the expiration
+        // or low-reservoir settings sat in preferences and never reached the pod. drop(1) skips
+        // the replayed current value, which would otherwise fire a command on every start.
+        // Mirrors OmnipodDashPumpPlugin.
+        merge(
+            preferences.observe(OmnipodBooleanPreferenceKey.ExpirationReminder).drop(1).map {},
+            preferences.observe(OmnipodIntPreferenceKey.ExpirationReminderHours).drop(1).map {},
+            preferences.observe(OmnipodBooleanPreferenceKey.ExpirationAlarm).drop(1).map {},
+            preferences.observe(OmnipodIntPreferenceKey.ExpirationAlarmHours).drop(1).map {},
+            preferences.observe(OmnipodBooleanPreferenceKey.LowReservoirAlert).drop(1).map {},
+            preferences.observe(OmnipodIntPreferenceKey.LowReservoirAlertUnits).drop(1).map {},
+        ).collectResilient(newScope, aapsLogger, LTag.PUMP) { commandQueue.customCommand(CommandUpdateAlertConfiguration()) }
     }
 
     override suspend fun onStop() {
         super.onStop()
         handler?.removeCallbacks(statusChecker)
+        scope?.cancel()
+        scope = null
     }
 
     // -- connection lifecycle -------------------------------------------------------------
@@ -336,14 +363,28 @@ class O5PumpPlugin @Inject constructor(
         bleManager.sendCommand(cmd, AlarmStatusResponse::class).ignoreElements()
     }
 
-    private fun fetchStatus(): Completable = Completable.defer {
+    /**
+     * Reconnects to the pod if the BLE link has dropped, then completes. A no-op while the
+     * session is up - `O5BleManagerImpl.connect` emits `PodEvent.AlreadyConnected` and
+     * completes without sending anything.
+     *
+     * Guards the stop/status sends that run inside the long bolus-delivery wait, during which
+     * the pod routinely drops the link. [O5BleManager.sendCommand] does not connect on its own,
+     * so without this a cancel or status poll fails on a dropped link and the bolus keeps
+     * running - the pod never receives the stop.
+     */
+    private fun ensureConnected(): Completable = Completable.defer {
+        bleManager.connect().ignoreElements()
+    }
+
+    private fun fetchStatus(): Completable = ensureConnected().andThen(Completable.defer {
         val cmd = GetStatusCommand.Builder()
             .setUniqueId(requirePodId())
             .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
             .setStatusResponseType(ResponseType.StatusResponseType.DEFAULT_STATUS_RESPONSE)
             .build()
         bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements()
-    }
+    })
         .andThen(Completable.defer { fetchActivationTimeIfNeeded() })
         .andThen(Completable.defer { fetchTriggeredAlertsIfNeeded() })
 
@@ -746,7 +787,7 @@ class O5PumpPlugin @Inject constructor(
         Single.just(requestedUnits) // still uncertain - left for reconcilePendingDose() on the next status poll
     }
 
-    private fun cancelBolus(): Completable = Completable.defer {
+    private fun cancelBolus(): Completable = ensureConnected().andThen(Completable.defer {
         val cmd = StopDeliveryCommand.Builder()
             .setUniqueId(requirePodId())
             .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
@@ -754,7 +795,7 @@ class O5PumpPlugin @Inject constructor(
             .setDeliveryType(StopDeliveryCommand.DeliveryType.BOLUS)
             .build()
         bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements()
-    }
+    })
 
     override fun stopBolusDelivering() {
         aapsLogger.info(LTag.PUMP, "O5 stopBolusDelivering called")

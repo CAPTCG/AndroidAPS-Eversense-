@@ -768,11 +768,33 @@ class O5PumpPluginTest : TestBaseWithProfile() {
         whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
         whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
         whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+        // The status read reconnects first (see O5PumpPlugin.ensureConnected).
+        whenever(bleManager.connect()).thenReturn(Observable.empty())
 
         runBlocking { plugin.setTempBasalAbsolute(1.0, 30, false, PumpSync.TemporaryBasalType.NORMAL) }
 
         // A status read plus the temp basal itself - not refused before reaching the pod.
         verify(bleManager, atLeast(2)).sendCommand(any(), any())
+    }
+
+    @Test
+    fun `a status read reconnects first, so it cannot fail on a link the pod has dropped`() {
+        // The pod routinely drops the BLE link during a long bolus, and sendCommand does not
+        // connect on its own - without the reconnect a cancel or status poll fails and the
+        // bolus keeps running. connect() is a no-op when the session is still up.
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.podId).thenReturn(12345L)
+        whenever(podStateManager.pendingDoseCommand)
+            .thenReturn(pendingBolus(sequenceNumber = 9))
+            .thenReturn(null)
+        whenever(podStateManager.sequenceNumberOfLastProgrammingCommand).thenReturn(9)
+        whenever(podStateManager.deliveryStatus).thenReturn(DeliveryStatus.BOLUS_AND_BASAL_ACTIVE)
+        whenever(bleManager.sendCommand(any(), any())).thenReturn(Observable.empty())
+        whenever(bleManager.connect()).thenReturn(Observable.empty())
+
+        runBlocking { plugin.setTempBasalAbsolute(1.0, 30, false, PumpSync.TemporaryBasalType.NORMAL) }
+
+        verify(bleManager, atLeast(1)).connect()
     }
 
     @Test
