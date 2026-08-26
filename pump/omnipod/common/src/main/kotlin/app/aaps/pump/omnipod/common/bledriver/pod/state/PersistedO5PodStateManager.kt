@@ -191,6 +191,13 @@ class PersistedO5PodStateManager @Inject constructor(
             store()
         }
 
+    override var lastBolusIsBasalCorrection: Boolean
+        get() = podState.lastBolusIsBasalCorrection
+        set(value) {
+            podState.lastBolusIsBasalCorrection = value
+            store()
+        }
+
     override var activeTempBasalStartTime: Long?
         get() = podState.activeTempBasalStartTime
         set(value) {
@@ -440,6 +447,7 @@ class PersistedO5PodStateManager @Inject constructor(
         var lastBolusStartTime: Long? = null,
         var lastBolusRequestedUnits: Double? = null,
         var lastBolusDeliveredUnits: Double? = null,
+        var lastBolusIsBasalCorrection: Boolean = false,
         var activeTempBasalStartTime: Long? = null,
         var activeTempBasalRate: Double? = null,
         var activeTempBasalDurationMinutes: Short? = null,

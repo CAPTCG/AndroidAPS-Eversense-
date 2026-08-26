@@ -389,7 +389,8 @@ class O5OverviewViewModel @Inject constructor(
             text += " (${rh.gs(CommonR.string.omnipod_common_uncertain)})"
             return text to StatusLevel.CRITICAL
         }
-        val startTime = podStateManager.lastBolusStartTime ?: return null to StatusLevel.NORMAL
+        // lastUserBolusStartTime: a basal drift correction must not be shown as the user's last bolus.
+        val startTime = podStateManager.lastUserBolusStartTime ?: return null to StatusLevel.NORMAL
         val bolusSize = podStateManager.lastBolusDeliveredUnits ?: podStateManager.lastBolusRequestedUnits ?: return null to StatusLevel.NORMAL
         val text = ch.insulinAmountAgoString(PumpInsulin(PumpType.OMNIPOD_5.determineCorrectBolusSize(bolusSize)), startTime)
         val level = if (podStateManager.lastBolusDeliveredUnits == null) StatusLevel.WARNING else StatusLevel.NORMAL

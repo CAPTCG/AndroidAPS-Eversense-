@@ -651,8 +651,10 @@ class O5PumpPlugin @Inject constructor(
 
     private fun syncPumpFlows() {
         _lastDataTime.value = podStateManager.lastStatusResponseReceived ?: 0L
-        _lastBolusTime.value = podStateManager.lastBolusStartTime
-        _lastBolusAmount.value = podStateManager.lastBolusRequestedUnits?.let { PumpInsulin(it) }
+        // lastUserBolus*, not lastBolus*: these two flows feed the Nightscout device status
+        // ("LastBolus"/"LastBolusAmount"), and a drift correction is not a bolus the user gave.
+        _lastBolusTime.value = podStateManager.lastUserBolusStartTime
+        _lastBolusAmount.value = podStateManager.lastUserBolusRequestedUnits?.let { PumpInsulin(it) }
         _reservoirLevel.value = PumpInsulin(
             podStateManager.reservoirPulsesRemaining?.let { it * PodConstants.POD_PULSE_BOLUS_UNITS }
                 ?: RESERVOIR_OVER_50_UNITS_DEFAULT
@@ -700,6 +702,7 @@ class O5PumpPlugin @Inject constructor(
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedUnits
             podStateManager.lastBolusDeliveredUnits = null
+            podStateManager.lastBolusIsBasalCorrection = false
 
             val cmd = ProgramBolusCommand.Builder()
                 .setUniqueId(requirePodId())
@@ -1149,8 +1152,12 @@ class O5PumpPlugin @Inject constructor(
 
         // Safety check: don't correct when TBR = 0 (algorithm explicitly requested zero insulin),
         // except a zero temp due to recent bolus delivery, where corrections are still allowed.
+        // lastUserBolusStartTime, not lastBolusStartTime: a correction is itself recorded as the last
+        // bolus, so without the filter every correction would refresh the 5-minute window that permits
+        // the next one, leaving the 2-minute cooldown as the only limiter - 0.05U every 2 min against a
+        // zero TBR, i.e. exactly when the algorithm asked for nothing.
         if (podStateManager.activeTempBasalRate == 0.0) {
-            val timeSinceLastBolus = podStateManager.lastBolusStartTime?.let { System.currentTimeMillis() - it }
+            val timeSinceLastBolus = podStateManager.lastUserBolusStartTime?.let { System.currentTimeMillis() - it }
             if (timeSinceLastBolus == null || timeSinceLastBolus >= 5 * 60 * 1000L) return false
         }
 
@@ -1204,6 +1211,9 @@ class O5PumpPlugin @Inject constructor(
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedInsulinAmount
             podStateManager.lastBolusDeliveredUnits = null
+            // Tag it, so this correction cannot satisfy the zero-TBR exemption in
+            // needsBasalCorrection and re-arm the 5-minute window for the next one.
+            podStateManager.lastBolusIsBasalCorrection = true
 
             val cmd = ProgramBolusCommand.Builder()
                 .setUniqueId(requirePodId())

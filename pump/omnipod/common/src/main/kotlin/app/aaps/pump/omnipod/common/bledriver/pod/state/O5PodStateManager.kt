@@ -103,6 +103,26 @@ interface O5PodStateManager {
      *  [app.aaps.pump.omnipod.common.O5PumpPlugin]'s bolus-completion polling). */
     var lastBolusDeliveredUnits: Double?
 
+    /**
+     * True when [lastBolusStartTime] / [lastBolusRequestedUnits] describe a basal drift correction
+     * rather than a bolus the user or the loop asked for. Mirrors
+     * `OmnipodDashPodStateManager.LastBolus.isBasalCorrection`; set it alongside every write to
+     * [lastBolusStartTime].
+     */
+    var lastBolusIsBasalCorrection: Boolean
+
+    /**
+     * [lastBolusStartTime] unless that record is a basal drift correction.
+     *
+     * Use this anywhere a bolus is surfaced to the user (pod overview, Nightscout device status) or
+     * where behaviour is gated on a bolus the user or the loop actually asked for - notably the
+     * zero-TBR exemption in `O5PumpPlugin.needsBasalCorrection`, which a correction must not re-arm.
+     */
+    val lastUserBolusStartTime: Long? get() = lastBolusStartTime?.takeIf { !lastBolusIsBasalCorrection }
+
+    /** [lastBolusRequestedUnits] unless that record is a correction. See [lastUserBolusStartTime]. */
+    val lastUserBolusRequestedUnits: Double? get() = lastBolusRequestedUnits?.takeIf { !lastBolusIsBasalCorrection }
+
     var activeTempBasalStartTime: Long?
     var activeTempBasalRate: Double?
     var activeTempBasalDurationMinutes: Short?
@@ -335,6 +355,7 @@ class InMemoryO5PodStateManager : O5PodStateManager {
     @Volatile override var lastBolusStartTime: Long? = null
     @Volatile override var lastBolusRequestedUnits: Double? = null
     @Volatile override var lastBolusDeliveredUnits: Double? = null
+    @Volatile override var lastBolusIsBasalCorrection: Boolean = false
     @Volatile override var activeTempBasalStartTime: Long? = null
     @Volatile override var activeTempBasalRate: Double? = null
     @Volatile override var activeTempBasalDurationMinutes: Short? = null
@@ -499,6 +520,7 @@ class InMemoryO5PodStateManager : O5PodStateManager {
         lastBolusStartTime = null
         lastBolusRequestedUnits = null
         lastBolusDeliveredUnits = null
+        lastBolusIsBasalCorrection = false
         activeTempBasalStartTime = null
         activeTempBasalRate = null
         activeTempBasalDurationMinutes = null
