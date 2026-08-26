@@ -617,8 +617,10 @@ class OmnipodDashPumpPlugin @Inject constructor(
 
     private fun syncPumpFlows() {
         _lastDataTime.value = podStateManager.lastUpdatedSystem
-        _lastBolusTime.value = podStateManager.lastBolus?.startTime
-        _lastBolusAmount.value = podStateManager.lastBolus?.requestedUnits?.let { PumpInsulin(it) }
+        // lastUserBolus, not lastBolus: these two flows feed the Nightscout device status
+        // ("LastBolus"/"LastBolusAmount"), and a drift correction is not a bolus the user gave.
+        _lastBolusTime.value = podStateManager.lastUserBolus?.startTime
+        _lastBolusAmount.value = podStateManager.lastUserBolus?.requestedUnits?.let { PumpInsulin(it) }
         _reservoirLevel.value = if (podStateManager.activationProgress.isBefore(ActivationProgress.COMPLETED)) {
             PumpInsulin(0.0)
         } else {
@@ -1455,7 +1457,10 @@ class OmnipodDashPumpPlugin @Inject constructor(
                     podStateManager.createLastBolus(
                         record.amout,
                         command.historyId,
-                        record.bolusType.toBolusInfoBolusType()
+                        record.bolusType.toBolusInfoBolusType(),
+                        // Same signal the pulse accounting in updateFromDefaultStatusResponse uses:
+                        // true only while deliverBasalCorrection is running.
+                        isBasalCorrection = podStateManager.basalCorrectionInProgress
                     )
                 } else {
                     pumpSync.syncBolusWithPumpId(
