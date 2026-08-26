@@ -10,7 +10,6 @@ import app.aaps.core.data.model.data.TargetBlock
 import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.aps.APS
 import app.aaps.core.interfaces.configuration.Config
-import app.aaps.core.interfaces.insulin.InsulinType
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.nsclient.ProcessedDeviceStatusData
@@ -189,7 +188,7 @@ sealed class ProfileSealed(
             // Inhaled insulin (e.g. Afrezza) has a much shorter DIA than injected insulin, so it
             // is checked against its own range - see HardLimits.LIMIT_DIA_INHALED.
             val diaRange =
-                if (InsulinType.fromPeak(it.insulinPeakTime).isInhaled) hardLimits.diaInhaledRange()
+                if (it.isInhaled) hardLimits.diaInhaledRange()
                 else hardLimits.diaRange()
             if (it.dia !in diaRange) {
                 validityCheck.isValid = false

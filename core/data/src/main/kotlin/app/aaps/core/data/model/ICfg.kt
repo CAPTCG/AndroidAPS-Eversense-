@@ -24,11 +24,27 @@ data class ICfg(
     /**
      * Insulin concentration (0.2 for U20, 2.0 for U200 insulin)
      */
-    var concentration: Double = 1.0
+    var concentration: Double = 1.0,
+    /**
+     * True for inhaled insulin (e.g. Afrezza).
+     *
+     * Authored in the insulin editor and stored - deliberately NOT re-derived from
+     * [insulinPeakTime]. Only the factory-default Afrezza peak (15 min) matches a template exactly,
+     * so deriving it drops the inhaled identity for any peak the user picks inside the valid
+     * 10-30 min range, taking the inhaled DIA limits and the Afrezza dialog's insulin lookup with it.
+     *
+     * Where no stored flag exists (a row read back from the database, legacy catalogue JSON, a
+     * Nightscout payload written by an older build) it is reconstructed from the peak via
+     * `InsulinType.isInhaledPeak`, which is unambiguous because the two peak ranges are disjoint.
+     */
+    var isInhaled: Boolean = false
 ) {
 
-    constructor(insulinLabel: String, peak: Int, dia: Double, concentration: Double)
-        : this(insulinLabel = insulinLabel, insulinEndTime = (dia * 3600 * 1000).toLong(), insulinPeakTime = (peak * 60000).toLong(), concentration = concentration)
+    constructor(insulinLabel: String, peak: Int, dia: Double, concentration: Double, isInhaled: Boolean = false)
+        : this(
+        insulinLabel = insulinLabel, insulinEndTime = (dia * 3600 * 1000).toLong(), insulinPeakTime = (peak * 60000).toLong(),
+        concentration = concentration, isInhaled = isInhaled
+    )
     /**
     * Used in InsulinPlugin (insulin editor)
     */
@@ -41,6 +57,8 @@ data class ICfg(
             if (insulinPeakTime != iCfg.insulinPeakTime)
                 return false
             if (concentration != iCfg.concentration)
+                return false
+            if (isInhaled != iCfg.isInhaled)
                 return false
             return true
         }
@@ -93,7 +111,7 @@ data class ICfg(
     /**
      * deepClone is only used in insulin editor
      */
-    fun deepClone(): ICfg = ICfg(insulinLabel, insulinEndTime, insulinPeakTime, concentration).also { it.insulinNickname = insulinNickname }
+    fun deepClone(): ICfg = ICfg(insulinLabel, insulinEndTime, insulinPeakTime, concentration, isInhaled).also { it.insulinNickname = insulinNickname }
 
     fun iobCalcForTreatment(bolus: BS, time: Long): Iob {
         assert(insulinEndTime != 0L)

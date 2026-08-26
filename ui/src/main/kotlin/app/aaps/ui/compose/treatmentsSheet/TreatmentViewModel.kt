@@ -105,7 +105,7 @@ class TreatmentViewModel @Inject constructor(
             val showCalculator = preferences.get(BooleanKey.OverviewShowWizardButton)
             // Show Afrezza button if user has configured an inhaled insulin
             val showAfrezza = insulinManager.insulins.any {
-                InsulinType.fromPeak(it.insulinPeakTime).isInhaled
+                it.isInhaled
             }
 
             val showSettingsIcon = !preferences.simpleMode

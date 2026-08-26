@@ -310,7 +310,7 @@ private fun MealLinkItem(
                             )
                         }
 
-                        val isAfrezzaDose = InsulinType.fromPeak(bolus.iCfg.insulinPeakTime).isInhaled
+                        val isAfrezzaDose = bolus.iCfg.isInhaled
 
                         // Insulin label (when different from active) — skip for Afrezza, its type label
                         // already says so. The running profile owns the authoritative iCfg; with no

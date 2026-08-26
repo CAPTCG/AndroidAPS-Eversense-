@@ -255,7 +255,10 @@ class InsulinManagementViewModel @Inject constructor(
     private fun applyCardSwitch(index: Int) {
         val insulins = uiState.value.insulins
         val iCfg = insulins.getOrNull(index) ?: return
-        val editorTemplate = InsulinType.fromPeak(iCfg.insulinPeakTime)
+        // The stored flag is authoritative for the inhaled identity: fromPeak only matches the exact
+        // factory peak (15 min for Afrezza), so a user-chosen peak anywhere else inside the valid
+        // 10-30 min range would silently load as a non-inhaled insulin.
+        val editorTemplate = if (iCfg.isInhaled) InsulinType.OREF_INHALED_AFREZZA else InsulinType.fromPeak(iCfg.insulinPeakTime)
         val editorNickname = iCfg.insulinNickname.takeIf { it.isNotBlank() } ?: rh.gs(editorTemplate.label)
         val defaultNickname = rh.gs(editorTemplate.label)
         val autoNameEnabled = editorNickname == defaultNickname
@@ -426,7 +429,10 @@ class InsulinManagementViewModel @Inject constructor(
             insulinLabel = fullName,
             insulinEndTime = 0,
             insulinPeakTime = 0,
-            concentration = state.editorConcentration.value
+            concentration = state.editorConcentration.value,
+            // Persist the identity the editor has been holding in view state. Everything downstream
+            // reads this instead of re-deriving it from the peak.
+            isInhaled = state.editorTemplate?.isInhaled == true
         )
         editedICfg.insulinNickname = nickname
         editedICfg.setDia(state.editorDiaHours)

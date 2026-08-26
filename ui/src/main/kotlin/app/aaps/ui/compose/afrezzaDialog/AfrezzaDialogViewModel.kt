@@ -80,10 +80,7 @@ class AfrezzaDialogViewModel @Inject constructor(
     private fun findAfrezzaIcfg(): ICfg? {
         val afrezzaPeak = InsulinType.OREF_INHALED_AFREZZA.insulinPeakTime
         return insulinManager.insulins.firstOrNull { it.insulinPeakTime == afrezzaPeak }
-            ?: insulinManager.insulins.firstOrNull {
-                val template = InsulinType.fromPeak(it.insulinPeakTime)
-                template.isInhaled
-            }
+            ?: insulinManager.insulins.firstOrNull { it.isInhaled }
     }
 
     fun selectCartridge(units: Int) {

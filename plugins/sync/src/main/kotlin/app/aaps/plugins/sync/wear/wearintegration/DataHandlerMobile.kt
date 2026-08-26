@@ -876,7 +876,7 @@ class DataHandlerMobile @Inject constructor(
         // Find the Afrezza ICfg from InsulinManager
         val afrezzaPeak = InsulinType.OREF_INHALED_AFREZZA.insulinPeakTime
         val afrezzaIcfg = insulinManager.insulins.firstOrNull { it.insulinPeakTime == afrezzaPeak }
-            ?: insulinManager.insulins.firstOrNull { InsulinType.fromPeak(it.insulinPeakTime).isInhaled }
+            ?: insulinManager.insulins.firstOrNull { it.isInhaled }
         if (afrezzaIcfg == null) {
             sendError(rh.gs(app.aaps.core.ui.R.string.afrezza_not_configured))
             return
@@ -897,7 +897,7 @@ class DataHandlerMobile @Inject constructor(
         if (rejectIfAapsClient()) return
         val afrezzaPeak = InsulinType.OREF_INHALED_AFREZZA.insulinPeakTime
         val afrezzaIcfg = insulinManager.insulins.firstOrNull { it.insulinPeakTime == afrezzaPeak }
-            ?: insulinManager.insulins.firstOrNull { InsulinType.fromPeak(it.insulinPeakTime).isInhaled }
+            ?: insulinManager.insulins.firstOrNull { it.isInhaled }
         if (afrezzaIcfg == null) {
             sendError(rh.gs(app.aaps.core.ui.R.string.afrezza_not_configured))
             return
