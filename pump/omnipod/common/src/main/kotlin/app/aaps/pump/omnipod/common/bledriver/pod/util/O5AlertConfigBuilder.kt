@@ -72,20 +72,25 @@ fun buildO5ExpirationAlerts(podStateManager: O5PodStateManager, preferences: Pre
     val userExpiryReminderDelay = podLifeLeft.minus(
         Duration.ofHours(userConfiguredExpirationReminderHours ?: (PodConstants.MAX_POD_LIFETIME.toHours() + 1))
     )
-    if (!userExpiryReminderDelay.isNegative) {
-        alerts.add(
-            AlertConfiguration(
-                AlertType.USER_SET_EXPIRATION,
-                enabled = userExpiryReminderEnabled,
-                durationInMinutes = 0,
-                autoOff = false,
-                AlertTrigger.TimerTrigger(userExpiryReminderDelay.toMinutes().toShort()),
-                BeepType.FOUR_TIMES_BIP_BEEP,
-                BeepRepetitionType.EVERY_MINUTE_AND_EVERY_15_MIN
-            )
-        )
-    } else {
+    // USER_SET_EXPIRATION is added unconditionally, unlike Dash which omits it when the
+    // reminder is off. ProgramAlerts only rewrites the slots the command actually carries,
+    // so leaving this one out does not clear it - a reminder programmed earlier keeps
+    // beeping on the pod after the user disables it. Sending it with enabled=false is what
+    // clears the slot. Found against real hardware by Prem Nirmal.
+    val reminderActive = userExpiryReminderEnabled && !userExpiryReminderDelay.isNegative
+    if (userExpiryReminderEnabled && userExpiryReminderDelay.isNegative) {
         aapsLogger.warn(LTag.PUMPBTCOMM, "buildO5ExpirationAlerts negative expiryAlertDuration=$userExpiryReminderDelay")
     }
+    alerts.add(
+        AlertConfiguration(
+            AlertType.USER_SET_EXPIRATION,
+            enabled = reminderActive,
+            durationInMinutes = 0,
+            autoOff = false,
+            AlertTrigger.TimerTrigger(if (reminderActive) userExpiryReminderDelay.toMinutes().toShort() else 0),
+            BeepType.FOUR_TIMES_BIP_BEEP,
+            BeepRepetitionType.EVERY_MINUTE_AND_EVERY_15_MIN
+        )
+    )
     return alerts
 }

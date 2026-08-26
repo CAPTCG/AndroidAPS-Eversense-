@@ -30,7 +30,10 @@ import app.aaps.core.interfaces.queue.CustomCommand
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.collectResilient
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.interfaces.withCompose
+import app.aaps.core.ui.compose.ComposeScreenContent
 import app.aaps.core.ui.compose.icons.IcPluginOmnipod
+import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.pump.omnipod.common.bledriver.comm.O5BleManager
 import app.aaps.pump.omnipod.common.bledriver.pod.command.DeactivateCommand
 import app.aaps.pump.omnipod.common.bledriver.pod.command.GetStatusCommand
@@ -60,8 +63,11 @@ import app.aaps.pump.omnipod.common.bledriver.pod.state.O5PodStateManager
 import app.aaps.pump.omnipod.common.bledriver.pod.state.basalDrift
 import app.aaps.pump.omnipod.common.bledriver.pod.state.basalDelivered
 import app.aaps.pump.omnipod.common.bledriver.pod.util.buildO5ExpirationAlerts
+import app.aaps.pump.omnipod.common.keys.DashBooleanPreferenceKey
+import app.aaps.pump.omnipod.common.keys.O5IntentKey
 import app.aaps.pump.omnipod.common.keys.OmnipodBooleanPreferenceKey
 import app.aaps.pump.omnipod.common.keys.OmnipodIntPreferenceKey
+import app.aaps.pump.omnipod.common.ui.O5CertificateStoreScreen
 import app.aaps.pump.omnipod.common.queue.command.CommandDeactivatePod
 import app.aaps.pump.omnipod.common.queue.command.CommandDeliverBasalCorrection
 import app.aaps.pump.omnipod.common.queue.command.CommandDisableSuspendAlerts
@@ -85,6 +91,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.rx3.rxCompletable
 import org.json.JSONObject
@@ -144,7 +151,10 @@ class O5PumpPlugin @Inject constructor(
         .pluginName(R.string.omnipod_5_name)
         .shortName(R.string.omnipod_5_name_short)
         .description(R.string.omnipod_5_pump_description),
-    ownPreferences = listOf(OmnipodBooleanPreferenceKey::class.java),
+    ownPreferences = listOf(
+        OmnipodBooleanPreferenceKey::class.java, OmnipodIntPreferenceKey::class.java,
+        DashBooleanPreferenceKey::class.java, O5IntentKey::class.java
+    ),
     aapsLogger, rh, preferences, commandQueue
 ), Pump {
 
@@ -175,18 +185,53 @@ class O5PumpPlugin @Inject constructor(
 
     init {
         statusChecker = Runnable {
-            try {
-                runBlocking { getPumpStatus("O5 statusChecker") }
-            } catch (e: Exception) {
-                aapsLogger.warn(LTag.PUMP, "Error in O5 statusChecker: $e")
+            refreshStatusOnUnacknowledgedCommands()
+            // Re-arm only while a dose is still unconfirmed, so the tick stops on its own
+            // once there is nothing left to reconcile.
+            if (podStateManager.pendingDoseCommand != null) {
+                handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
             }
-            handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
+        }
+    }
+
+    /**
+     * (Re)starts the 60s [statusChecker] tick. Called wherever a dose-affecting command records a
+     * pending marker, so an unconfirmed dose is reconciled promptly instead of waiting for the next
+     * loop-driven read. The tick self-stops once the marker clears.
+     */
+    private fun armStatusChecker() {
+        handler?.removeCallbacks(statusChecker)
+        handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
+    }
+
+    /**
+     * Queues one status read when a dose-affecting command was left unconfirmed.
+     *
+     * The periodic tick used to call `getPumpStatus` unconditionally, which forced a BLE connect
+     * every 60s for the life of the plugin and drained the phone battery. Routine polling is
+     * already driven by the loop cycle and `KeepAliveWorker` (as it is for Dash), so the pod can
+     * stay disconnected between cycles; this only reaches out when
+     * [O5PodStateManager.pendingDoseCommand] survived, which is what makes an uncertain delivery
+     * outcome recoverable rather than silently lost. The queued read routes through
+     * [getPumpStatus], which runs reconciliation at the end.
+     *
+     * Mirrors `OmnipodDashPumpPlugin.refreshStatusOnUnacknowledgedCommands`.
+     */
+    private fun refreshStatusOnUnacknowledgedCommands() {
+        if (podStateManager.activationProgress == ActivationProgress.COMPLETED &&
+            podStateManager.pendingDoseCommand != null &&
+            commandQueue.size() == 0 &&
+            commandQueue.performing() == null
+        ) {
+            scope?.launch { commandQueue.readStatus(rh.gs(R.string.omnipod_5_unconfirmed_command)) }
         }
     }
 
     override suspend fun onStart() {
         super.onStart()
-        handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
+        if (podStateManager.pendingDoseCommand != null) {
+            handler?.postDelayed(statusChecker, STATUS_CHECK_INTERVAL_MS)
+        }
         val newScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         scope = newScope
         // Push the pod's alert configuration as soon as any alert preference changes. Without
@@ -596,6 +641,7 @@ class O5PumpPlugin @Inject constructor(
                 startedAt = System.currentTimeMillis(),
                 sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
+            armStatusChecker()
             val basalBeeps = preferences.get(OmnipodBooleanPreferenceKey.BasalBeepsEnabled)
             val cmd = ProgramBasalCommand.Builder()
                 .setUniqueId(requirePodId())
@@ -699,6 +745,7 @@ class O5PumpPlugin @Inject constructor(
                 startedAt = startedAt,
                 sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
+            armStatusChecker()
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedUnits
             podStateManager.lastBolusDeliveredUnits = null
@@ -830,6 +877,7 @@ class O5PumpPlugin @Inject constructor(
                 startedAt = startedAt,
                 sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
+            armStatusChecker()
             val cmd = ProgramTempBasalCommand.Builder()
                 .setUniqueId(requirePodId())
                 .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
@@ -887,6 +935,7 @@ class O5PumpPlugin @Inject constructor(
             startedAt = System.currentTimeMillis(),
             sequenceNumber = podStateManager.msgSequenceNumber.toShort()
         )
+        armStatusChecker()
         val cmd = StopDeliveryCommand.Builder()
             .setUniqueId(requirePodId())
             .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
@@ -1208,6 +1257,7 @@ class O5PumpPlugin @Inject constructor(
                 isBasalCorrection = true,
                 sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
+            armStatusChecker()
             podStateManager.lastBolusStartTime = startedAt
             podStateManager.lastBolusRequestedUnits = requestedInsulinAmount
             podStateManager.lastBolusDeliveredUnits = null
@@ -1246,5 +1296,60 @@ class O5PumpPlugin @Inject constructor(
             podStateManager.basalCorrectionInProgress = false
         }
     }
+
+    // -- preference screen ------------------------------------------------------------------
+
+    /**
+     * Mirrors `OmnipodDashPumpPlugin.getPreferenceScreenContent`'s grouping, minus
+     * [DashBooleanPreferenceKey.UseBonding] - O5 does not honour it, so offering the toggle
+     * would be a control that silently does nothing.
+     *
+     * Without this the O5 alert and beep preferences were read at runtime but had no screen to
+     * set them from, so they were stuck at their defaults.
+     */
+    override fun getPreferenceScreenContent() = PreferenceSubScreenDef(
+        key = "omnipod_5_settings",
+        titleResId = R.string.omnipod_5_name,
+        items = listOf(
+            PreferenceSubScreenDef(
+                key = "omnipod_5_beeps",
+                titleResId = R.string.omnipod_common_preferences_category_confirmation_beeps,
+                items = listOf(
+                    OmnipodBooleanPreferenceKey.BolusBeepsEnabled,
+                    OmnipodBooleanPreferenceKey.BasalBeepsEnabled,
+                    OmnipodBooleanPreferenceKey.SmbBeepsEnabled,
+                    OmnipodBooleanPreferenceKey.TbrBeepsEnabled
+                )
+            ),
+            PreferenceSubScreenDef(
+                key = "omnipod_5_alerts",
+                titleResId = R.string.omnipod_common_preferences_category_alerts,
+                items = listOf(
+                    OmnipodBooleanPreferenceKey.ExpirationReminder,
+                    OmnipodIntPreferenceKey.ExpirationReminderHours,
+                    OmnipodBooleanPreferenceKey.ExpirationAlarm,
+                    OmnipodIntPreferenceKey.ExpirationAlarmHours,
+                    OmnipodBooleanPreferenceKey.LowReservoirAlert,
+                    OmnipodIntPreferenceKey.LowReservoirAlertUnits
+                )
+            ),
+            PreferenceSubScreenDef(
+                key = "omnipod_5_notifications",
+                titleResId = R.string.omnipod_common_preferences_category_notifications,
+                items = listOf(
+                    OmnipodBooleanPreferenceKey.SoundUncertainTbrNotification,
+                    OmnipodBooleanPreferenceKey.SoundUncertainSmbNotification,
+                    OmnipodBooleanPreferenceKey.SoundUncertainBolusNotification,
+                    DashBooleanPreferenceKey.SoundDeliverySuspendedNotification
+                )
+            ),
+            O5IntentKey.CertificateStore.withCompose(
+                ComposeScreenContent { onBack ->
+                    O5CertificateStoreScreen(rh = rh, onBack = onBack)
+                }
+            )
+        ),
+        icon = pluginDescription.icon
+    )
 
 }
