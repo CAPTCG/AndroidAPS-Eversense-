@@ -1,21 +1,21 @@
 package app.aaps.plugins.automation.triggers
 
+import app.aaps.core.data.format.NumberFormat
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.ui.compose.icons.IcActivity
+import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.utils.JsonHelper
 import app.aaps.plugins.automation.R
-import app.aaps.plugins.automation.compose.IconTint
 import app.aaps.plugins.automation.elements.Comparator
 import app.aaps.plugins.automation.elements.InputDouble
 import app.aaps.plugins.automation.elements.InputDropdownMenu
 import dagger.android.HasAndroidInjector
 import org.json.JSONObject
-import java.text.DecimalFormat
 
 class TriggerStepsCount(injector: HasAndroidInjector) : Trigger(injector) {
 
     var measurementDuration: InputDropdownMenu = InputDropdownMenu(rh, "5")
-    var stepsCount: InputDouble = InputDouble(100.0, 0.0, 20000.0, 10.0, DecimalFormat("1"))
+    var stepsCount: InputDouble = InputDouble(100.0, 0.0, 20000.0, 10.0, NumberFormat.INTEGER)
     var comparator: Comparator = Comparator(rh).apply {
         value = Comparator.Compare.IS_EQUAL_OR_GREATER
     }
@@ -76,7 +76,7 @@ class TriggerStepsCount(injector: HasAndroidInjector) : Trigger(injector) {
         rh.gs(R.string.triggerStepsCountDesc, measurementDuration.value, rh.gs(comparator.value.stringRes), stepsCount.value)
 
     override fun composeIcon() = IcActivity
-    override fun composeIconTint() = IconTint.Exercise
+    override fun elementType() = ElementType.EXERCISE
 
     override fun duplicate(): Trigger {
         return TriggerStepsCount(injector).also { o ->

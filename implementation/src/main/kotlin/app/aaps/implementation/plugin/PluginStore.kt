@@ -101,6 +101,11 @@ class PluginStore @Inject constructor(
                 )
             )
         }
+        // Note: USE_FULL_SCREEN_INTENT is intentionally NOT requested. Google Play silently
+        // re-revokes it on every update for a sideloaded, non-alarm app, so it can never be relied
+        // on. Background alarms instead wake the screen and launch the alarm activity via
+        // AlarmManager.setAlarmClock() (see AlarmScreenWakeReceiver / AlarmNotificationManager),
+        // which is permission-free.
     }
 
     private var activeBgSourceStore: BgSource? = null

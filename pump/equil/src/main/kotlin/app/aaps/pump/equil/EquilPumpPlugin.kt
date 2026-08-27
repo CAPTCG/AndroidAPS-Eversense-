@@ -7,6 +7,7 @@ import app.aaps.core.data.pump.defs.ManufacturerType
 import app.aaps.core.data.pump.defs.PumpDescription
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.pump.defs.TimeChangeType
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.insulin.ConcentrationHelper
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -89,7 +90,8 @@ class EquilPumpPlugin @Inject constructor(
     private val ch: ConcentrationHelper,
     private val notificationManager: NotificationManager,
     private val protectionCheck: ProtectionCheck,
-    private val blePreCheck: BlePreCheck
+    private val blePreCheck: BlePreCheck,
+    private val config: Config
 ) : PumpPluginBase(
     pluginDescription = PluginDescription()
         .mainType(PluginType.PUMP)
@@ -97,7 +99,8 @@ class EquilPumpPlugin @Inject constructor(
             EquilComposeContent(
                 pluginName = rh.gs(R.string.equil_name),
                 protectionCheck = protectionCheck,
-                blePreCheck = blePreCheck
+                blePreCheck = blePreCheck,
+                config = config
             )
         }
         .icon(IcPluginEquil)
@@ -129,13 +132,15 @@ class EquilPumpPlugin @Inject constructor(
 
         rxBus.toFlow(EventEquilAlarm::class.java)
             .collectResilient(newScope, aapsLogger, LTag.PUMP) { eventEquilError ->
-                commandQueue.performing()?.let {
-                    if (it.commandType == Command.CommandType.BOLUS) {
-                        aapsLogger.info(LTag.PUMPCOMM, "eventEquilError.tips====${eventEquilError.tips}")
-                        notificationManager.dismiss(NotificationId.EQUIL_ALARM)
-                        notificationManager.post(NotificationId.EQUIL_ALARM, eventEquilError.tips, soundRes = app.aaps.core.ui.R.raw.alarm)
-                        stopBolusDelivering()
-                    }
+                aapsLogger.info(LTag.PUMPCOMM, "eventEquilError.tips====${eventEquilError.tips}")
+                // Always surface the pump alarm - it is no longer gated on a bolus being in progress
+                // (alarms now come from the GATT history read on every connection, not just from an
+                // advertisement scan caught mid-bolus). See #5040.
+                notificationManager.dismiss(NotificationId.EQUIL_ALARM)
+                notificationManager.post(NotificationId.EQUIL_ALARM, eventEquilError.tips, soundRes = app.aaps.core.ui.R.raw.alarm)
+                // But only halt bolus tracking if a bolus is actually delivering.
+                if (commandQueue.performing()?.commandType == Command.CommandType.BOLUS) {
+                    stopBolusDelivering()
                 }
             }
         preferences.observe(EquilIntPreferenceKey.EquilTone).drop(1).collectResilient(newScope, aapsLogger, LTag.PUMP) {
@@ -412,7 +417,7 @@ class EquilPumpPlugin @Inject constructor(
             val alarmBattery10 = preferences.get(EquilBooleanKey.AlarmBattery10)
             if (!alarmBattery10) {
                 notificationManager.post(
-                    NotificationId.FAILED_UPDATE_PROFILE,
+                    NotificationId.EQUIL_LOW_BATTERY,
                     rh.gs(R.string.equil_low_battery) + battery + "%",
                     soundRes = app.aaps.core.ui.R.raw.alarm
                 )
@@ -420,7 +425,7 @@ class EquilPumpPlugin @Inject constructor(
             } else {
                 if (battery < 5) {
                     notificationManager.post(
-                        NotificationId.FAILED_UPDATE_PROFILE,
+                        NotificationId.EQUIL_LOW_BATTERY,
                         rh.gs(R.string.equil_low_battery) + battery + "%",
                         NotificationLevel.IMPORTANT,
                         soundRes = app.aaps.core.ui.R.raw.alarm

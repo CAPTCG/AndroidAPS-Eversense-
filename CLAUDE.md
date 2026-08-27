@@ -64,6 +64,14 @@
   preference, propose the change first and wait for approval before editing code. Do NOT immediately
   edit files based on user feedback. The only exception is when the user explicitly says "do it",
   "fix it", "go ahead", or similar direct instruction.
+- **NEVER commit until the user explicitly asks** — Editing files is fine (subject to the rule above),
+  but do NOT run `git commit` (or `git push`) until the user directly asks for it. "Fix it" / "do it"
+  authorizes the code change, NOT a commit. Leave the work in the working tree and let the user review
+  it first; only commit when they say "commit", "push", or similar.
+- **Use simple "school english" everywhere** — In code (identifiers, comments, KDoc), commit messages,
+  PR text, UI strings and chat, write plain, simple English. Many readers and contributors are
+  non-native speakers. Prefer short common words and short sentences; avoid idioms, slang, rare
+  vocabulary, and needlessly complex phrasing. Clear over clever.
 - **Think critically, don't just agree** — Before implementing, evaluate whether the agreed approach
   is actually the best solution. Challenge assumptions, point out potential issues, suggest better
   alternatives. The user may miss something too. Ask "Is this the best way?" before writing code.
@@ -99,6 +107,26 @@
       `mutableListOf<ImageVector>()`
     - Only exception: when two different classes with the same simple name would collide — then one
       can stay fully qualified at use site (rare)
+- **KDoc `[symbol]` references must resolve, or use backticks:** The IDE lint
+  (`KDocUnresolvedReference`) flags any `[Xxx]` link in a `/** */` block that can't be resolved from
+  the current file. A `[Xxx]` link only resolves if `Xxx` is importable here — imported, in the same
+  package, or written as a fully-qualified name whose module is on **this** module's main classpath.
+  When touching a file that has such a warning, fix it (don't mass-fix untouched files):
+    - **Prefer a clickable link.** If a resolvable symbol exists, link it — use an **interface** in a
+      `core:interfaces` (or similar already-depended-on) module rather than a concrete impl in another
+      module. A fully-qualified link is fine when the short name isn't imported:
+      `[app.aaps.core.interfaces.aps.Loop.invoke]`.
+    - **NEVER add a module dependency just to make a doc link resolve.** If the only matching symbol
+      is `private`, or lives in a module this one doesn't depend on (or only as `testImplementation`),
+      it can't be linked.
+    - **Then fall back to backticks.** Wrap the unresolvable reference in backticks so it's a plain
+      code span, not a checked link — lint has nothing to resolve, and it still renders as monospace:
+      `` `LoopPlugin.applySMBRequest` ``.
+    - Do NOT use `@Suppress("KDocUnresolvedReference")` — it's unreliable on the enclosing
+      declaration and hides real breakage of any *other* link in the same doc block. Backticks are the
+      fix.
+    - ❌ BAD: `* handled in [LoopPlugin.applySMBRequest].` (private, cross-module → unresolved)
+    - ✅ GOOD: `` * handled in [app.aaps.core.interfaces.aps.Loop.invoke] and `LoopPlugin.applySMBRequest`. ``
 - **Use centralized theme/styling:**
     - For Compose UI: Always use theme values instead of hardcoded dp/padding/colors. If proper
       setting doesn't exist, discuss it before creating hardcoded values.

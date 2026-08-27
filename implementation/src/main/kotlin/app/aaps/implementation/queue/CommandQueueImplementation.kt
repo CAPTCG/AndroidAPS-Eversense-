@@ -1,13 +1,6 @@
 package app.aaps.implementation.queue
 
-import android.os.Handler
-import android.os.HandlerThread
-import android.os.SystemClock
 import android.text.Spanned
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import app.aaps.annotations.OpenForTesting
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.EPS
@@ -43,7 +36,6 @@ import app.aaps.core.interfaces.rx.events.EventMobileToWear
 import app.aaps.core.interfaces.rx.events.EventProfileChangeRequested
 import app.aaps.core.interfaces.rx.weardata.EventData
 import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
@@ -75,13 +67,16 @@ import app.aaps.implementation.queue.commands.CommandTempBasalAbsolute
 import app.aaps.implementation.queue.commands.CommandTempBasalPercent
 import app.aaps.implementation.queue.commands.CommandUpdateTime
 import kotlinx.coroutines.CompletableDeferred
+import app.aaps.implementation.profile.ProfileSwitchSilentGate
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.LinkedList
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 
 @OpenForTesting
 @Singleton
@@ -95,22 +90,19 @@ class CommandQueueImplementation @Inject constructor(
     private val config: Config,
     private val dateUtil: DateUtil,
     private val fabricPrivacy: FabricPrivacy,
-    private val uiInteraction: UiInteraction,
     private val notificationManager: NotificationManager,
     private val persistenceLayer: PersistenceLayer,
     private val decimalFormatter: DecimalFormatter,
     private val pumpEnactResultProvider: Provider<PumpEnactResult>,
     private val pumpSync: PumpSync,
     private val preferences: Preferences,
+    private val profileSwitchSilentGate: ProfileSwitchSilentGate,
     private val localAlertUtils: Provider<LocalAlertUtils>,
     private val smsCommunicator: Provider<SmsCommunicator>,
-    private val jobName: CommandQueueName,
-    private val workManager: WorkManager,
+    private val commandExecutor: Provider<CommandExecutor>,
     @ApplicationScope private val appScope: CoroutineScope,
     private val bolusProgressData: BolusProgressData
 ) : CommandQueue {
-
-    internal var handler = Handler(HandlerThread(this::class.simpleName + "Handler").also { it.start() }.looper)
 
     private val queue = LinkedList<Command>()
 
@@ -127,27 +119,27 @@ class CommandQueueImplementation @Inject constructor(
     // (and the awaited deferred) on its own; this only guards the pathological lost-callback case so a
     // hung set can't block the sequential profile-change collector forever. Tune if pumps legitimately
     // need longer.
-    private val PROFILE_SET_TIMEOUT_MS = 10 * 60 * 1000L
+    @Suppress("PrivatePropertyName")
+    private val PROFILE_SET_TIMEOUT_MS = 10 * 60 * 1000
 
     init {
         // collectResilient guarantees a single failed onProfileChanged() can never permanently wedge
-        // profile switching (an unguarded collector would be cancelled for the whole process lifetime,
+        // profile switching (an unguarded collector would be canceled for the whole process lifetime,
         // after which every later ProfileSwitch is silently dropped: no pump push, no
         // EffectiveProfileSwitch, isProfileChangePending() stuck true). The hang vector is handled
         // separately by the withTimeoutOrNull() inside onProfileChanged().
+        // Each branch carries whether the resulting write should be silent (no PROFILE_SET_OK notification):
+        // the event carries it directly (scene revert), while a bare PS DB change (scene start / anyone else)
+        // consumes the one-shot ProfileSwitchSilentGate flag the scene set just before inserting its PS.
         merge(
-            rxBus.toFlow(EventProfileChangeRequested::class.java),
-            persistenceLayer.observeChanges(PS::class.java)
-        ).collectResilient(appScope, aapsLogger, LTag.PROFILE) { onProfileChanged() }
-        /*
-         * Clear old WorkManager jobs, because they survive restart
-         */
-        workManager.cancelUniqueWork(jobName.name)
+            rxBus.toFlow(EventProfileChangeRequested::class.java).map { it.silent },
+            persistenceLayer.observeChanges(PS::class.java).map { profileSwitchSilentGate.consumeSilent() }
+        ).collectResilient(appScope, aapsLogger, LTag.PROFILE) { silent -> onProfileChanged(silent) }
     }
 
-    private suspend fun onProfileChanged() {
+    private suspend fun onProfileChanged(silent: Boolean = false) {
         if (config.AAPSCLIENT) return // Effective profileswitch should be synced over NS, do not create EffectiveProfileSwitch here
-        aapsLogger.debug(LTag.PROFILE, "onProfileChanged")
+        aapsLogger.debug(LTag.PROFILE, "onProfileChanged (silent=$silent)")
         // Exceptions are handled by collectResilient at the call site; here we only guard the hang vector.
         profileFunction.getRequestedProfile()?.let {
             // Skip if the active EPS was already triggered by this PS (e.g. NSClient updating PS with nsId
@@ -160,22 +152,15 @@ class CommandQueueImplementation @Inject constructor(
             // Bound the pump round-trip. setProfile() awaits a CommandSetProfile callback; if that
             // callback is ever lost the deferred never completes, and because the collector processes
             // emissions sequentially that single hang would block every future ProfileSwitch. On
-            // timeout we treat it as a failed update so the collector stays alive.
-            val result = withTimeoutOrNull(PROFILE_SET_TIMEOUT_MS) {
+            // timeout, we treat it as a failed update so the collector stays alive.
+            val result = withTimeoutOrNull(PROFILE_SET_TIMEOUT_MS.milliseconds) {
                 setProfile(ProfileSealed.PS(it, activePlugin), it.ids.nightscoutId != null)
             }
-            if (result == null) {
+            if (result == null)
                 aapsLogger.error(LTag.PROFILE, "setProfile timed out after $PROFILE_SET_TIMEOUT_MS ms for PS id=${it.id}")
-                uiInteraction.runAlarm(
-                    rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile),
-                    rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile),
-                    app.aaps.core.ui.R.raw.boluserror
-                )
-                return@let
-            }
-            if (!result.success) {
-                uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile), app.aaps.core.ui.R.raw.boluserror)
-            } else {
+            // Central profile-set notification lifecycle (unified across all pump drivers). Returns true on a
+            // successful write, in which case we persist the EffectiveProfileSwitch below.
+            if (postProfileWriteResult(result, silent)) {
                 // Pump may return enacted == false if basal profile is the same, but IC/ISF can be different
                 val nonCustomized = ProfileSealed.PS(it, activePlugin).convertToNonCustomizedProfile(dateUtil)
                 val eps = EPS(
@@ -199,16 +184,49 @@ class CommandQueueImplementation @Inject constructor(
         }
     }
 
+    /**
+     * Central profile-set notification lifecycle, unified across every pump driver (drivers now only return a
+     * [PumpEnactResult]; none post profile-set notifications themselves). `internal` so it can be unit-tested.
+     *
+     *  - failure (timeout `result == null`, or `!success`): post the persistent [NotificationId.FAILED_UPDATE_PROFILE]
+     *    "wrong basal until fixed" card, rung via [app.aaps.core.ui.R.raw.boluserror]; the driver's `comment` supplies
+     *    the reason (a timeout has none). Deliberately NOT a full-screen `runAlarm` — a wrong base profile is serious
+     *    but persistent, so a dismissible alarm-notification is the right weight (a failed TBR is even quieter,
+     *    surfaced only in the loop status).
+     *  - success: clear any stale FAILED_UPDATE_PROFILE; and on a real write ([PumpEnactResult.enacted]) that is not
+     *    internal/automatic (`!silent` — e.g. a Scene reverting its own ProfileSwitch, issue #4959) raise the
+     *    "Basal profile in pump updated" ([NotificationId.PROFILE_SET_OK]) confirmation. Deferred / already-set writes
+     *    return enacted=false and stay fully silent per the contract.
+     *
+     * Dismissing FAILED_UPDATE_PROFILE centrally is safe only because Equil's alarms were migrated off that id to
+     * EQUIL_LOW_BATTERY / PUMP_ERROR.
+     *
+     * @return true when write succeeded (the caller then persists the EffectiveProfileSwitch).
+     */
+    internal fun postProfileWriteResult(result: PumpEnactResult?, silent: Boolean): Boolean {
+        if (result == null || !result.success) {
+            notificationManager.post(
+                NotificationId.FAILED_UPDATE_PROFILE,
+                result?.comment?.takeIf { it.isNotBlank() } ?: rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile),
+                soundRes = app.aaps.core.ui.R.raw.boluserror
+            )
+            return false
+        }
+        notificationManager.dismiss(NotificationId.FAILED_UPDATE_PROFILE)
+        if (result.enacted && !silent)
+            notificationManager.post(NotificationId.PROFILE_SET_OK, rh.gs(app.aaps.core.ui.R.string.profile_set_ok), validMinutes = 60)
+        return true
+    }
+
     private fun executingNowError(): PumpEnactResult =
         pumpEnactResultProvider.get().success(false).enacted(false).comment(R.string.executing_right_now)
 
     /**
      * Running-mode gate: reject commands that contradict the currently active running mode.
-     * Returns true if the command was rejected (caller should return false); false if allowed.
+     * Returns the rejection result if the gate rejects, or null if the command is allowed.
      * Fails open on read errors — the gate is a belt, not the only line; upstream checks already
-     * handle most suspended-mode paths in [LoopPlugin.invoke] and [applySMBRequest].
+     * handle most suspended-mode paths in [app.aaps.core.interfaces.aps.Loop.invoke] and `LoopPlugin.applySMBRequest`.
      */
-    /** Returns the rejection result if the gate rejects, or null if the command is allowed. */
     private suspend fun rejectedByRunningModeGate(kind: PumpCommandGate.CommandKind): PumpEnactResult? {
         val mode = try {
             persistenceLayer.getRunningModeActiveAt(dateUtil.now()).mode
@@ -249,22 +267,20 @@ class CommandQueueImplementation @Inject constructor(
     }
 
     /**
-     * Watchdog. I observed issue where work stuck in RUNNING state but nothing actually happens
-     * (last work completed successfully).
-     * Cancel scheduled work in this case
+     * READSTATUS dedup + stall telemetry. If a READSTATUS sits at the tail of the queue for more than
+     * 15 min the executor is stalled (a driver's execute() is blocking). Surface it for telemetry only.
      */
     private var readScheduledDetected: Long? = null
 
     @Synchronized
     fun isReadStatusScheduled(): Boolean {
-        /*
-         * Cancel all works if ReadStatus is scheduled for more than 15 min
-         */
         readScheduledDetected?.let {
             if (dateUtil.isOlderThan(it, minutes = 15)) {
-                workManager.cancelUniqueWork(jobName.name)
-                fabricPrivacy.logCustom("QueueWorkerStuck")
-                Thread.sleep(5000)
+                // The app-owned executor cannot be wedged in a WorkManager RUNNING state; a genuine
+                // stall means a driver's execute() is blocking. Nothing here can unblock a blocking
+                // driver, so only surface it (do NOT cancel — that would risk the exact mid-command
+                // teardown this migration removed).
+                fabricPrivacy.logCustom("CommandExecutorStuck")
             }
         }
 
@@ -324,34 +340,12 @@ class CommandQueueImplementation @Inject constructor(
         performing = null
     }
 
-    private fun workIsRunning(): Boolean {
-        for (workInfo in workManager.getWorkInfosForUniqueWork(jobName.name).get())
-            if (workInfo.state == WorkInfo.State.BLOCKED || workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING)
-                return true
-        return false
-    }
-
-    // After new command added to the queue
-    // start thread again if not already running
-    @Synchronized fun notifyAboutNewCommand() = handler.post {
-        waitForFinishedThread()
-        if (!workIsRunning()) {
-            workManager.enqueueUniqueWork(
-                jobName.name, ExistingWorkPolicy.APPEND_OR_REPLACE,
-                OneTimeWorkRequest.Builder(QueueWorker::class.java)
-                    .build()
-            )
-            aapsLogger.debug(LTag.PUMPQUEUE, "Starting new work")
-        } else {
-            aapsLogger.debug(LTag.PUMPQUEUE, "Work is already running")
-        }
-    }
-
-    fun waitForFinishedThread() {
-        while (workIsRunning() && waitingForDisconnect) {
-            aapsLogger.debug(LTag.PUMPQUEUE, "Waiting for previous work finish")
-            SystemClock.sleep(500)
-        }
+    // After a new command is added to the queue, wake the single app-owned executor loop. The loop is
+    // started on demand (idempotent) and drains the queue to completion; a signal while it is busy is a
+    // conflated no-op. Returns Boolean so CommandQueueMocked can override this to a no-op in tests.
+    fun notifyAboutNewCommand(): Boolean {
+        commandExecutor.get().signal()
+        return true
     }
 
     @Synchronized
@@ -379,7 +373,8 @@ class CommandQueueImplementation @Inject constructor(
                     source = Sources.Database
                 )
                 pumpEnactResultProvider.get().enacted(false).success(true)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.PUMPQUEUE, "Failed to store carbs", e)
                 pumpEnactResultProvider.get().enacted(false).success(false)
             }
         }
@@ -439,6 +434,9 @@ class CommandQueueImplementation @Inject constructor(
                 )
             } catch (e: Exception) {
                 aapsLogger.error(LTag.PUMPQUEUE, "Failed to store carbs after bolus", e)
+                // The bolus succeeded but the carbs weren't persisted, so COB/IOB would be wrong and the
+                // loss was previously silent (log-only). Alert the user so they can re-enter the carbs.
+                notificationManager.post(NotificationId.CARBS_STORE_FAILED, rh.gs(app.aaps.core.ui.R.string.carbs_not_saved_after_bolus))
             }
         }
         return result

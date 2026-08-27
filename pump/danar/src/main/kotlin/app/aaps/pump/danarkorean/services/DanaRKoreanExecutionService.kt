@@ -124,7 +124,7 @@ class DanaRKoreanExecutionService : AbstractDanaRExecutionService() {
             }
             rxBus.send(EventDanaRNewStatus())
             rxBus.send(EventInitializationChanged())
-            if (danaPump.dailyTotalUnits > danaPump.maxDailyTotalUnits * Constants.dailyLimitWarning) {
+            if (danaPump.dailyTotalUnits > danaPump.maxDailyTotalUnits * Constants.DAILY_RESERVOIR_LIMIT_WARNING) {
                 aapsLogger.debug(LTag.PUMP, "Approaching daily limit: " + danaPump.dailyTotalUnits + "/" + danaPump.maxDailyTotalUnits)
                 if (System.currentTimeMillis() > lastApproachingDailyLimit + 30 * 60 * 1000) {
                     notificationManager.post(NotificationId.APPROACHING_DAILY_LIMIT, R.string.approachingdailylimit)
@@ -205,6 +205,9 @@ class DanaRKoreanExecutionService : AbstractDanaRExecutionService() {
                 bolusProgressData.updateProgress(bolusProgressData.state.value?.percent ?: 0, bolusProgressData.state.value?.status ?: "", PumpInsulin(0.0))
                 return false
             }
+            // Arm the 15s comm watchdog from bolus start (was never initialised → a stale timestamp
+            // made the check below fire on the first iteration, falsely aborting the bolus).
+            danaPump.bolusProgressLastTimeStamp = System.currentTimeMillis()
             while (!danaPump.bolusStopped && !start.failed && !connectionBroken) {
                 SystemClock.sleep(100)
                 if (System.currentTimeMillis() - danaPump.bolusProgressLastTimeStamp > 15 * 1000L) { // if i didn't receive status for more than 15 sec expecting broken comm
@@ -233,7 +236,10 @@ class DanaRKoreanExecutionService : AbstractDanaRExecutionService() {
         danaPump.lastSettingsRead = 0 // force read full settings
         getPumpStatus()
         rxBus.send(EventPumpStatusChanged(EventPumpStatusChanged.Status.DISCONNECTING))
-        return true
+        // Report the actual write outcome. sendMessage is blocking, so msgSet.failed is populated by now.
+        // Previously this returned true unconditionally, masking a genuine pump rejection as success.
+        // Notifications are handled centrally from this Boolean via AbstractDanaRPlugin + onProfileChanged.
+        return !msgSet.failed
     }
 
     override fun setUserOptions(): PumpEnactResult? = null

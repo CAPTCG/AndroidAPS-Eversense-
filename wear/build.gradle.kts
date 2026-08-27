@@ -1,5 +1,8 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.ksp)
@@ -67,6 +70,7 @@ android {
             dimension = "standard"
             resValue("string", "app_name", "AAPS")
             resValue("string", "label_actions_activity", "AAPS")
+            resValue("color", "flavor_header_color", "#B0BEC5")
             versionName = Versions.appVersion
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         }
@@ -75,6 +79,7 @@ android {
             dimension = "standard"
             resValue("string", "app_name", "Pumpcontrol")
             resValue("string", "label_actions_activity", "Pumpcontrol")
+            resValue("color", "flavor_header_color", "#B0BEC5")
             versionName = Versions.appVersion + "-pumpcontrol"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_pumpcontrol"
         }
@@ -83,6 +88,7 @@ android {
             dimension = "standard"
             resValue("string", "app_name", "AAPSClient")
             resValue("string", "label_actions_activity", "AAPSClient")
+            resValue("color", "flavor_header_color", "#E8C50C")
             versionName = Versions.appVersion + "-aapsclient"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_yellowowl"
         }
@@ -91,6 +97,7 @@ android {
             dimension = "standard"
             resValue("string", "app_name", "AAPSClient2")
             resValue("string", "label_actions_activity", "AAPSClient2")
+            resValue("color", "flavor_header_color", "#0FBBE0")
             versionName = Versions.appVersion + "-aapsclient2"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_blueowl"
         }
@@ -99,6 +106,7 @@ android {
             dimension = "standard"
             resValue("string", "app_name", "AAPSClient3")
             resValue("string", "label_actions_activity", "AAPSClient3")
+            resValue("color", "flavor_header_color", "#64E86A")
             versionName = Versions.appVersion + "-aapsclient3"
             manifestPlaceholders["appIcon"] = "@mipmap/ic_greenowl"
         }
@@ -115,8 +123,89 @@ allprojects {
     }
 }
 
+/**
+ * Validates a Watch Face Push face APK (built by :wear:watchfacepush) with Google's offline
+ * validator and embeds the APK plus its validation token into this variant's assets under
+ * `watchfacepush/`. The token is a hash over the exact APK bytes, so it must be regenerated on
+ * every face build — never hardcoded.
+ */
+abstract class EmbedWatchFaceTask @Inject constructor(
+    private val execOperations: org.gradle.process.ExecOperations
+) : DefaultTask() {
+
+    /** Resolved artifact of :wear:watchfacepush — the variant's APK output directory */
+    @get:InputFiles
+    abstract val watchFaceApkDir: ConfigurableFileCollection
+
+    @get:Input
+    abstract val clientPackageName: Property<String>
+
+    @get:Classpath
+    abstract val validatorClasspath: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val watchFaceApk = watchFaceApkDir.asFileTree.files.singleOrNull { it.extension == "apk" }
+            ?: throw GradleException("Expected exactly one watch face APK in ${watchFaceApkDir.files}")
+        val stdout = ByteArrayOutputStream()
+        execOperations.javaexec {
+            classpath = validatorClasspath
+            mainClass.set("com.google.android.wearable.watchface.validator.cli.DwfValidation")
+            args(
+                "--apk_path=${watchFaceApk.absolutePath}",
+                "--package_name=${clientPackageName.get()}"
+            )
+            standardOutput = stdout
+        }
+        val output = stdout.toString()
+        val token = Regex("generated token: (\\S+)").find(output)?.groupValues?.get(1)
+            ?: throw GradleException("Watch face validation did not produce a token:\n$output")
+        val assetDir = outputDir.get().asFile.resolve("watchfacepush")
+        assetDir.deleteRecursively()
+        assetDir.mkdirs()
+        watchFaceApk.copyTo(assetDir.resolve("aapsv4.apk"), overwrite = true)
+        assetDir.resolve("aapsv4_token.txt").writeText(token)
+    }
+}
+
+val watchFacePushValidator: Configuration = configurations.create("watchFacePushValidator") {
+    isCanBeConsumed = false
+}
+
+extensions.configure<ApplicationAndroidComponentsExtension>("androidComponents") {
+    onVariants { variant ->
+        val flavor = variant.flavorName ?: return@onVariants
+        val flavorCap = flavor.replaceFirstChar { it.uppercase() }
+        // The face is always embedded from its release build (signed with the debug key in the
+        // face module) — the wear app's own build type does not change the face APK. Consumed as
+        // an artifact configuration so the producing tasks are wired in automatically.
+        val faceApkConfiguration = configurations.create("watchFaceApk${variant.name.replaceFirstChar { it.uppercase() }}") {
+            isCanBeConsumed = false
+            isCanBeResolved = true
+        }
+        dependencies.add(
+            faceApkConfiguration.name,
+            dependencies.project(mapOf("path" to ":wear:watchfacepush", "configuration" to "watchfaceApk$flavorCap"))
+        )
+        val taskProvider = project.tasks.register(
+            "embed${variant.name.replaceFirstChar { it.uppercase() }}WatchFace",
+            EmbedWatchFaceTask::class.java
+        ) {
+            watchFaceApkDir.from(faceApkConfiguration)
+            clientPackageName.set(variant.applicationId)
+            validatorClasspath.from(watchFacePushValidator)
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(taskProvider, EmbedWatchFaceTask::outputDir)
+    }
+}
+
 
 dependencies {
+    watchFacePushValidator(libs.com.google.watchface.validator.push.cli)
+
     implementation(project(":shared:impl"))
     implementation(project(":core:interfaces"))
     implementation(project(":core:keys"))
@@ -132,6 +221,7 @@ dependencies {
     implementation(libs.androidx.wear.protolayout)
     implementation(libs.androidx.wear.protolayout.expression)
     implementation(libs.androidx.wear.watchface)
+    implementation(libs.androidx.wear.watchfacepush)
     implementation(libs.androidx.wear.watchface.complications.data)
     implementation(libs.androidx.wear.watchface.complications.datasource)
     implementation(libs.androidx.wear.watchface.complications.datasource.ktx)

@@ -5,7 +5,6 @@ import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.PS
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.time.T
-import app.aaps.core.interfaces.insulin.Insulin
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
@@ -18,7 +17,8 @@ import app.aaps.core.objects.profile.ProfileSealed
 import org.json.JSONObject
 import java.security.InvalidParameterException
 
-fun NSProfileSwitch.toProfileSwitch(profileRepository: ProfileRepository, dateUtil: DateUtil, insulinFallback: Insulin): PS? {
+/** [insulinFallback] stamps records uploaded without one — see `NsIncomingDataProcessor.fallbackICfg`. */
+fun NSProfileSwitch.toProfileSwitch(profileRepository: ProfileRepository, dateUtil: DateUtil, insulinFallback: ICfg): PS? {
     val pureProfile =
         profileJson?.let { pureProfileFromJson(JSONObject(it), dateUtil) ?: return null }
             ?: profileRepository.profile.value?.getSpecificProfile(profile) ?: return null
@@ -27,7 +27,7 @@ fun NSProfileSwitch.toProfileSwitch(profileRepository: ProfileRepository, dateUt
     val iCfg =
         iCfg?.let {
             ICfg(insulinLabel = it.insulinLabel, insulinEndTime = it.insulinEndTime, insulinPeakTime = it.insulinPeakTime, concentration = it.concentration)
-        } ?: insulinFallback.iCfg
+        } ?: insulinFallback
 
 
     return PS(
@@ -42,7 +42,10 @@ fun NSProfileSwitch.toProfileSwitch(profileRepository: ProfileRepository, dateUt
         profileName = originalProfileName ?: profile,
         timeshift = timeShift ?: 0,
         percentage = percentage ?: 100,
-        duration = duration ?: 0L,
+        // originalDuration is always written in milliseconds by AAPS and is the trustworthy source.
+        // Documents uploaded before 9b90eea774 carry a duration inflated by 60000 and no
+        // durationInMilliseconds, which TreatmentMapper then inflates by 60000 once more.
+        duration = originalDuration ?: duration ?: 0L,
         iCfg = iCfg,
         ids = IDs(nightscoutId = identifier, pumpId = pumpId, pumpType = PumpType.fromString(pumpType), pumpSerial = pumpSerial, endId = endId)
     )

@@ -21,7 +21,6 @@ import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.di.ApplicationScope
-import app.aaps.core.interfaces.insulin.Insulin
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -36,6 +35,7 @@ import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.interfaces.pump.BolusProgressData
 import app.aaps.core.interfaces.pump.PumpStatusProvider
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -119,7 +119,6 @@ class SmsCommunicatorPlugin @Inject constructor(
     private val profileFunction: ProfileFunction,
     private val profileUtil: ProfileUtil,
     private val activePlugin: ActivePlugin,
-    private val insulin: Insulin,
     private val profileRepository: ProfileRepository,
     private val commandQueue: CommandQueue,
     private val loop: Loop,
@@ -136,6 +135,7 @@ class SmsCommunicatorPlugin @Inject constructor(
     private val pumpStatusProvider: PumpStatusProvider,
     private val notificationManager: NotificationManager,
     private val runningModeGuard: RunningModeGuard,
+    private val bolusProgressData: BolusProgressData,
     @ApplicationScope private val appScope: CoroutineScope,
     val repository: SmsCommunicatorRepository
 ) : PluginBaseWithPreferences(
@@ -300,7 +300,7 @@ class SmsCommunicatorPlugin @Inject constructor(
         val minDistance =
             if (areMoreNumbers(preferences.get(StringKey.SmsAllowedNumbers)))
                 T.mins(preferences.get(IntKey.SmsRemoteBolusDistance).toLong()).msecs()
-            else Constants.remoteBolusMinDistance
+            else Constants.REMOTE_BOLUS_MIN_DISTANCE
 
         if (divided.isNotEmpty() && isCommand(divided[0].uppercase(Locale.getDefault()), receivedSms.phoneNumber)) {
             when (divided[0].uppercase(Locale.getDefault())) {
@@ -689,7 +689,6 @@ class SmsCommunicatorPlugin @Inject constructor(
                             percentage = finalPercentage,
                             receivedSms = receivedSms,
                             store = store,
-                            insulin = insulin,
                             profileFunction = profileFunction,
                             dateUtil = dateUtil,
                             rh = rh,
@@ -886,6 +885,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                     dateUtil = dateUtil,
                     decimalFormatter = decimalFormatter,
                     smsCommunicator = this,
+                    bolusProgressData = bolusProgressData,
                     sendSMSToAllNumbers = ::sendSMSToAllNumbers,
                     shortStatusBlocking = ::shortStatusBlocking,
                     updateLastRemoteBolusTime = { lastRemoteBolusTime = it }

@@ -14,9 +14,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.aaps.core.data.model.RM
 import app.aaps.core.data.model.TT
+import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.interfaces.overview.graph.TbrState
 import app.aaps.core.ui.compose.AapsSpacing
-import app.aaps.core.ui.compose.navigation.ElementType
 import app.aaps.core.ui.compose.navigation.NavigationRequest
 import app.aaps.ui.compose.main.TempTargetChipState
 import app.aaps.ui.compose.overview.chips.CobUiState
@@ -180,7 +180,8 @@ private fun NarrowChips(
             onClick = { onNavigate(NavigationRequest.Element(ElementType.PROFILE_MANAGEMENT)) },
             sceneManaged = profileSceneManaged,
             isNoProfile = profileName.isEmpty(),
-            enabled = commandsAllowed,
+            // Stays clickable even on an unpaired client: profile management opens read-only there,
+            // so this is a view affordance, not a command one (unlike the running-mode / TT chips).
             modifier = Modifier.weight(1f)
         )
     }

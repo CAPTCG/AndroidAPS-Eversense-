@@ -1,21 +1,16 @@
 package app.aaps.implementation.queue
 
 import android.content.Context
-import android.os.Handler
 import android.os.PowerManager
-import androidx.work.ListenableWorker
-import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import androidx.work.WorkerFactory
-import androidx.work.WorkerParameters
-import androidx.work.testing.TestListenableWorkerBuilder
 import app.aaps.core.data.model.BS
 import app.aaps.core.interfaces.alerts.LocalAlertUtils
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.notifications.NotificationAction
+import app.aaps.core.interfaces.notifications.NotificationId
+import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -29,15 +24,14 @@ import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventProfileChangeRequested
 import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.objects.constraints.ConstraintObject
+import app.aaps.implementation.profile.ProfileSwitchSilentGate
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
-import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.emptyFlow
@@ -47,13 +41,12 @@ import kotlinx.coroutines.yield
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
-import org.mockito.invocation.InvocationOnMock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
-import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -64,19 +57,18 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
 
     @Mock lateinit var constraintChecker: ConstraintsChecker
     @Mock lateinit var powerManager: PowerManager
-    @Mock lateinit var uiInteraction: UiInteraction
     @Mock lateinit var persistenceLayer: PersistenceLayer
     @Mock lateinit var pumpSync: PumpSync
     @Mock lateinit var localAlertUtils: LocalAlertUtils
     private val localAlertUtilsProvider: Provider<LocalAlertUtils> by lazy { Provider { localAlertUtils } }
     @Mock lateinit var smsCommunicator: SmsCommunicator
     private val smsCommunicatorProvider: Provider<SmsCommunicator> by lazy { Provider { smsCommunicator } }
-    @Mock lateinit var jobName: CommandQueueName
-    @Mock lateinit var workManager: WorkManager
-    @Mock lateinit var infos: ListenableFuture<List<WorkInfo>>
+    @Mock lateinit var commandExecutor: CommandExecutor
+    private val commandExecutorProvider: Provider<CommandExecutor> by lazy { Provider { commandExecutor } }
 
     private val testScope = CoroutineScope(Dispatchers.Unconfined)
     private val bolusProgressData by lazy { BolusProgressData(ch, rh, testScope) }
+    private val profileSwitchSilentGate = ProfileSwitchSilentGate()
 
     class CommandQueueMocked(
         aapsLogger: AAPSLogger,
@@ -88,23 +80,22 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
         config: Config,
         dateUtil: DateUtil,
         fabricPrivacy: FabricPrivacy,
-        uiInteraction: UiInteraction,
         notificationManager: NotificationManager,
         persistenceLayer: PersistenceLayer,
         decimalFormatter: DecimalFormatter,
         pumpEnactResultProvider: Provider<PumpEnactResult>,
         pumpSync: PumpSync,
         preferences: Preferences,
+        profileSwitchSilentGate: ProfileSwitchSilentGate,
         localAlertUtils: Provider<LocalAlertUtils>,
         smsCommunicator: Provider<SmsCommunicator>,
-        jobName: CommandQueueName,
-        workManager: WorkManager,
+        commandExecutor: Provider<CommandExecutor>,
         appScope: CoroutineScope,
         bolusProgressData: BolusProgressData
     ) : CommandQueueImplementation(
         aapsLogger, rxBus, rh, constraintChecker, profileFunction,
         activePlugin, config, dateUtil, fabricPrivacy,
-        uiInteraction, notificationManager, persistenceLayer, decimalFormatter, pumpEnactResultProvider, pumpSync, preferences, localAlertUtils, smsCommunicator, jobName, workManager, appScope, bolusProgressData
+        notificationManager, persistenceLayer, decimalFormatter, pumpEnactResultProvider, pumpSync, preferences, profileSwitchSilentGate, localAlertUtils, smsCommunicator, commandExecutor, appScope, bolusProgressData
     ) {
 
         override fun notifyAboutNewCommand(): Boolean = true
@@ -127,17 +118,16 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
                 config,
                 dateUtil,
                 fabricPrivacy,
-                uiInteraction,
                 notificationManager,
                 persistenceLayer,
                 decimalFormatter,
                 pumpEnactResultProvider,
                 pumpSync,
                 preferences,
+                profileSwitchSilentGate,
                 localAlertUtilsProvider,
                 smsCommunicatorProvider,
-                jobName,
-                workManager,
+                commandExecutorProvider,
                 testScope,
                 bolusProgressData
             )
@@ -171,58 +161,22 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
             whenever(rh.gs(app.aaps.core.ui.R.string.command_replaced)).thenReturn("Replaced by newer command")
             whenever(rh.gs(eq(app.aaps.core.ui.R.string.format_insulin_units), anyOrNull())).thenReturn("%1\$.2f U")
             whenever(rh.gs(app.aaps.core.ui.R.string.goingtodeliver)).thenReturn("Going to deliver %1\$.2f U")
-            whenever(workManager.getWorkInfosForUniqueWork(anyOrNull())).thenReturn(infos)
-            doAnswer { _: InvocationOnMock ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    val work = TestListenableWorkerBuilder<QueueWorker>(context)
-                        .setWorkerFactory(object : WorkerFactory() {
-                            override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                                QueueWorker(
-                                    appContext, workerParameters, aapsLogger, fabricPrivacy, commandQueue,
-                                    rxBus, activePlugin, rh, preferences, config, bolusProgressData
-                                )
-                        })
-                        .build()
-                    work.doWorkAndLog()
-                }
-                null
-            }.whenever(workManager).enqueueUniqueWork(anyOrNull(), anyOrNull(), any<OneTimeWorkRequest>())
-            whenever(infos.get()).thenReturn(emptyList())
         }
     }
 
     @Test
     fun commandIsPickedUp() = runTest {
+        lateinit var executor: CommandExecutor
         commandQueue = CommandQueueImplementation(
-            aapsLogger,
-            rxBus,
-            rh,
-            constraintChecker,
-            profileFunction,
-            activePlugin,
-            config,
-            dateUtil,
-            fabricPrivacy,
-            uiInteraction,
-            notificationManager,
-            persistenceLayer,
-            decimalFormatter,
-            pumpEnactResultProvider,
-            pumpSync,
-            preferences,
-            localAlertUtilsProvider,
-            smsCommunicatorProvider,
-            jobName,
-            workManager,
-            testScope,
-            bolusProgressData
+            aapsLogger, rxBus, rh, constraintChecker, profileFunction, activePlugin, config, dateUtil,
+            fabricPrivacy, notificationManager, persistenceLayer, decimalFormatter, pumpEnactResultProvider,
+            pumpSync, preferences, profileSwitchSilentGate, localAlertUtilsProvider, smsCommunicatorProvider,
+            Provider { executor }, testScope, bolusProgressData
         )
-        val handler: Handler = mock()
-        whenever(handler.post(anyOrNull())).thenAnswer { invocation: InvocationOnMock ->
-            (invocation.arguments[0] as Runnable).run()
-            true
-        }
-        commandQueue.handler = handler
+        // Real executor sharing this queue: notifyAboutNewCommand() signals it and it drains on its own thread.
+        executor = CommandExecutor(
+            aapsLogger, fabricPrivacy, commandQueue, rxBus, activePlugin, rh, preferences, config, bolusProgressData, context
+        )
 
         // start with empty queue
         assertThat(commandQueue.size()).isEqualTo(0)
@@ -232,10 +186,48 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
         yield()
         assertThat(commandQueue.size()).isEqualTo(1)
 
-        commandQueue.waitForFinishedThread()
+        // the executor picks up and drains the command off the test scheduler
         Thread.sleep(3000)
 
         assertThat(commandQueue.size()).isEqualTo(0)
+    }
+
+    @Test
+    fun bolusSucceedsButCarbsFailToStore_postsCarbsLostNotification() = runTest {
+        // Regression: bolus delivered, but persisting the accompanying carbs threw. This used to be
+        // swallowed log-only, leaving COB/IOB silently wrong. The failure must now surface a notification
+        // so the user knows to re-enter the carbs. See CommandQueueImplementation.bolus() post-bolus catch.
+        lateinit var executor: CommandExecutor
+        commandQueue = CommandQueueImplementation(
+            aapsLogger, rxBus, rh, constraintChecker, profileFunction, activePlugin, config, dateUtil,
+            fabricPrivacy, notificationManager, persistenceLayer, decimalFormatter, pumpEnactResultProvider,
+            pumpSync, preferences, profileSwitchSilentGate, localAlertUtilsProvider, smsCommunicatorProvider,
+            Provider { executor }, testScope, bolusProgressData
+        )
+        executor = CommandExecutor(
+            aapsLogger, fabricPrivacy, commandQueue, rxBus, activePlugin, rh, preferences, config, bolusProgressData, context
+        )
+        whenever(rh.gs(app.aaps.core.ui.R.string.carbs_not_saved_after_bolus)).thenReturn("Carbs could not be saved")
+        // The pump delivers successfully (TestPumpPlugin), but storing carbs blows up.
+        whenever(persistenceLayer.insertOrUpdateCarbs(anyOrNull(), anyOrNull(), anyOrNull(), anyOrNull()))
+            .thenThrow(RuntimeException("db unavailable"))
+
+        // Run the whole bolus() on a real dispatcher: its internal deferred.await() must resume on real
+        // threads (the queue worker completes it off the test scheduler), which Thread.sleep can advance.
+        // insulin != 0 → NOT the carbs-only path; carbs != 0 → carbs persisted only after the bolus succeeds.
+        var result: PumpEnactResult? = null
+        CoroutineScope(Dispatchers.IO).launch { result = commandQueue.bolus(DetailedBolusInfo().apply { insulin = 1.0; carbs = 20.0 }) }
+        var waitedMs = 0
+        while (result == null && waitedMs < 8000) {
+            Thread.sleep(100); waitedMs += 100
+        }
+        assertThat(result?.success).isTrue()
+
+        // The user is alerted (URGENT) that the carbs were lost — not silently dropped.
+        verify(notificationManager).post(
+            eq(NotificationId.CARBS_STORE_FAILED), eq("Carbs could not be saved"), any<NotificationLevel>(),
+            any<Int>(), anyOrNull(), any<List<NotificationAction>>(), anyOrNull()
+        )
     }
 
     @Test
@@ -257,6 +249,99 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
         // have cancelled the flow and the second event would never reach getRequestedProfile() (== 1).
         verify(profileFunction, times(2)).getRequestedProfile()
     }
+
+    // region postProfileWriteResult — the central, driver-agnostic profile-set notification contract.
+    // Drivers now only return (success, enacted, comment); every notification decision lives here.
+
+    private fun enactResult(isSuccess: Boolean, isEnacted: Boolean, commentText: String = ""): PumpEnactResult {
+        val result = mock<PumpEnactResult>()
+        whenever(result.success).thenReturn(isSuccess)
+        whenever(result.enacted).thenReturn(isEnacted)
+        whenever(result.comment).thenReturn(commentText)
+        return result
+    }
+
+    // Both helpers match the String post() overload (id, text, level, validMinutes, soundRes, actions, validityCheck).
+    private fun verifyOkPosted(text: String) =
+        verify(notificationManager).post(
+            eq(NotificationId.PROFILE_SET_OK), eq(text), any<NotificationLevel>(), any<Int>(),
+            anyOrNull(), any<List<NotificationAction>>(), anyOrNull()
+        )
+
+    private fun verifyFailurePosted(text: String) =
+        verify(notificationManager).post(
+            eq(NotificationId.FAILED_UPDATE_PROFILE), eq(text), any<NotificationLevel>(), any<Int>(),
+            eq(app.aaps.core.ui.R.raw.boluserror), any<List<NotificationAction>>(), anyOrNull()
+        )
+
+    private fun verifyNothingPosted() =
+        verify(notificationManager, never()).post(any<NotificationId>(), any<String>(), any<NotificationLevel>(), any<Int>(), anyOrNull(), any<List<NotificationAction>>(), anyOrNull())
+
+    @Test
+    fun postProfileWriteResult_updated_postsOkAndClearsFailure() {
+        // profile updated: success=true, enacted=true, not silent → confirmation shown, stale failure cleared.
+        whenever(rh.gs(app.aaps.core.ui.R.string.profile_set_ok)).thenReturn("Basal profile in pump updated")
+
+        val persisted = commandQueue.postProfileWriteResult(enactResult(isSuccess = true, isEnacted = true), silent = false)
+
+        assertThat(persisted).isTrue()
+        verify(notificationManager).dismiss(NotificationId.FAILED_UPDATE_PROFILE)
+        verifyOkPosted("Basal profile in pump updated")
+    }
+
+    @Test
+    fun postProfileWriteResult_alreadySet_isSilentButPersists() {
+        // already set (basal unchanged): success=true, enacted=false → no confirmation, but still persist EPS.
+        val persisted = commandQueue.postProfileWriteResult(enactResult(isSuccess = true, isEnacted = false), silent = false)
+
+        assertThat(persisted).isTrue()
+        verify(notificationManager).dismiss(NotificationId.FAILED_UPDATE_PROFILE)
+        verifyNothingPosted()
+    }
+
+    @Test
+    fun postProfileWriteResult_notInitialized_isSilentButPersists() {
+        // not initialized maps to success=true, enacted=false at the driver — same handling as already-set:
+        // no alarm, no confirmation, but the EPS is created so the loop has a profile.
+        val persisted = commandQueue.postProfileWriteResult(enactResult(isSuccess = true, isEnacted = false), silent = false)
+
+        assertThat(persisted).isTrue()
+        verifyNothingPosted()
+    }
+
+    @Test
+    fun postProfileWriteResult_error_ringsFailureAlarmAndDoesNotPersist() {
+        // any error: success=false → persistent FAILED_UPDATE_PROFILE card rung with boluserror; driver comment surfaces.
+        val persisted = commandQueue.postProfileWriteResult(enactResult(isSuccess = false, isEnacted = false, commentText = "pump rejected"), silent = false)
+
+        assertThat(persisted).isFalse()
+        verifyFailurePosted("pump rejected")
+        verify(notificationManager, never()).dismiss(any<NotificationId>())
+    }
+
+    @Test
+    fun postProfileWriteResult_timeout_ringsFailureAlarmWithFallbackText() {
+        // timeout: result == null (deferred pump callback never arrived) → treated as failure, generic fallback text.
+        whenever(rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile)).thenReturn("Failed to update basal profile")
+
+        val persisted = commandQueue.postProfileWriteResult(null, silent = false)
+
+        assertThat(persisted).isFalse()
+        verifyFailurePosted("Failed to update basal profile")
+        verify(notificationManager, never()).dismiss(any<NotificationId>())
+    }
+
+    @Test
+    fun postProfileWriteResult_silentEnacted_suppressesConfirmation() {
+        // issue #4959: a Scene reverting its own ProfileSwitch enacts a real write but must stay silent —
+        // no "Basal profile in pump updated" card. Still persists and clears any stale failure.
+        val persisted = commandQueue.postProfileWriteResult(enactResult(isSuccess = true, isEnacted = true), silent = true)
+
+        assertThat(persisted).isTrue()
+        verify(notificationManager).dismiss(NotificationId.FAILED_UPDATE_PROFILE)
+        verifyNothingPosted()
+    }
+    // endregion
 
     @Test
     fun doTests() = runTest {

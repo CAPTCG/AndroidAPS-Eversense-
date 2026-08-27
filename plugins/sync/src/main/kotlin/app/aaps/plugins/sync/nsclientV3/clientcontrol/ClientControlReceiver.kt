@@ -330,12 +330,13 @@ class ClientControlReceiver @Inject constructor(
         // typically. Treat it the same as an unknown type: advance the counter so the next
         // envelope can be processed.
         val message = runCatching { json.decodeFromString(ClientControlMessage.serializer(), envelope.payload) }.getOrNull()
-        // Master policy gate: when client control is OFF, reject mutating commands cleanly (signed Done/Failed ACK)
+        // Master policy gate: when client control is not operational (switch off, or the WebSocket it rides
+        // turned off — see clientControlOperational), reject mutating commands cleanly (signed Done/Failed ACK)
         // instead of silently dropping them — a silent drop times the client out → Unconfirmed → a false "master
         // offline" alarm in the toggle-propagation race window. Exempts Hello (pairing must still work while disabled)
         // and Ping (a liveness probe). Placed BEFORE the Hello branch so that branch stays adjacent to (and keeps
         // exhaustive) the when(message) below. Covers the WS push AND the poll fallback; consume the counter like expiry.
-        if (message !is ClientControlMessage.Hello && message !is ClientControlMessage.Ping && !preferences.get(BooleanKey.NsClientAllowClientControl)) {
+        if (message !is ClientControlMessage.Hello && message !is ClientControlMessage.Ping && !preferences.clientControlOperational()) {
             authorizedRepository.bumpLastSeen(entry.clientId, envelope.counter, now)
             nsClientRepository.addLog("◄ CLIENTCTL", "control disabled, rejecting ${envelope.type} from ${entry.name}")
             aapsLogger.warn(LTag.NSCLIENT, "ClientControl: $identifier rejected — client control disabled on master")
@@ -605,7 +606,7 @@ class ClientControlReceiver @Inject constructor(
             carbTime = message.carbTime, useBg = message.useBg, useCob = message.useCob, useIob = message.useIob,
             useTt = message.useTt, useTrend = message.useTrend, alarm = message.alarm, notes = message.notes,
             eCarbsGrams = message.eCarbsGrams, eCarbsDelayMinutes = message.eCarbsDelayMinutes, eCarbsDurationHours = message.eCarbsDurationHours,
-            profileName = message.profileName
+            profileName = message.profileName, source = Sources.NSClient
         )
         return when (val result = wizardBolusExecutor.prepareWizard(inputs)) {
             is WizardBolusExecutor.PrepareResult.Error   -> {
