@@ -55,7 +55,14 @@ class EversenseStatusActivity : AppCompatActivity(), EversenseWatcher {
     // EversenseWatcher: update button instantly on connection/state change
     override fun onConnectionChanged(connected: Boolean) { mainHandler.post { updateStatus() } }
     override fun onStateChanged(state: EversenseState) { mainHandler.post { updateStatus() } }
-    override fun onTransmitterReady() {}
+
+    // isConnected() is connected && transmitterReady. onConnectionChanged(true) fires as soon as
+    // the raw BLE link comes up, before the auth handshake finishes - at that point isConnected()
+    // is still false, so updateStatus() draws the red X. transmitterReady only flips true later,
+    // once auth completes, and that transition notifies watchers via onTransmitterReady() instead
+    // of onConnectionChanged() again. Without refreshing here too, the screen never learns the
+    // handshake finished and is stuck showing the red X until it's reopened.
+    override fun onTransmitterReady() { mainHandler.post { updateStatus() } }
     override fun onTransmitterNotPlaced() {}
     override fun onAlarmReceived(alarm: ActiveAlarm) {}
     override fun onCGMRead(type: app.aaps.plugins.eversense.enums.EversenseType, readings: List<app.aaps.plugins.eversense.models.EversenseCGMResult>) {}
