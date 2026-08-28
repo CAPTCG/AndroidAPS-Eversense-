@@ -80,7 +80,20 @@ Unlike the E365, the E3 does not exhibit the same contention problem — it can 
 9. **E3 only:** you may leave the official app installed; no disconnect step is required.
 10. In AAPS, go to Config Builder and select Eversense as your BG source.
 11. Open the Eversense plugin settings and enter your Eversense DMS account credentials (username and password). Both the E3 and E365 require credentials to authenticate with the Eversense cloud and retrieve your transmitter's security certificate at every new connection.
-12. Tap Connect to find your transmitter and pair it via Bluetooth.
+12. **E365 outside the US only:** in the same Credentials screen, enable **"Eversense 365 transmitter is European."** See "European (OUS) 365 Transmitters" below before you turn this on.
+13. Tap Connect to find your transmitter and pair it via Bluetooth.
+
+---
+
+### European (OUS) 365 Transmitters
+
+The Eversense 365 plugin talks to Eversense's cloud (DMS) as a mandatory part of pairing, not just for portal sync — the transmitter won't finish authenticating without it. That cloud login was originally hardcoded to Eversense's US servers, so a European (or other outside-US/"OUS") 365 account could never actually connect: the transmitter would pair over Bluetooth and then immediately disconnect and retry, forever, because the login was always going to the wrong region.
+
+**If you have a European Eversense 365 transmitter, enable "Eversense 365 transmitter is European"** in the Credentials screen (step 12 above) before tapping Connect. This routes login and cloud sync through Eversense's EU/OUS servers instead. Leave it **off** for a US transmitter — the toggle defaults to off and changes nothing for US users.
+
+**Status: new and only lightly tested.** Two of the three EU endpoints used by this toggle are confirmed live against Eversense's real infrastructure; the third (portal/glucose-history upload) reuses the same EU host the E3 plugin already uses successfully in production, but hasn't yet been separately confirmed for the 365. If you enable this and pairing still fails or portal sync doesn't show up, please open an issue with your `Eversense.log` (Settings → Export Logs, or pull `/sdcard/AndroidAPS/eversense/Eversense.log`) so the exact failure point can be identified.
+
+If you flip this toggle after already entering credentials, AAPS will automatically re-authenticate on the next connection — no need to re-enter your username/password.
 
 ---
 
@@ -88,6 +101,8 @@ Unlike the E365, the E3 does not exhibit the same contention problem — it can 
 
 ### Credentials
 Enter your Eversense DMS account username and password. Both the E3 and E365 require credentials to authenticate with the Eversense cloud and retrieve your transmitter's security certificate at every new connection.
+
+**"Eversense 365 transmitter is European"** — a toggle in the same screen, off by default. See "European (OUS) 365 Transmitters" below.
 
 ### Calibration
 Displays your current calibration phase, the date of your last calibration, and when your next calibration is due. When the transmitter is ready, the Calibrate button becomes active — tap it, enter your fingerstick reading, and the value is sent directly to the transmitter over Bluetooth. Calibration is not accepted during the warm-up or initialization phase. An alert to calibrate will be displayed each time a calibration is required.
@@ -118,13 +133,13 @@ These same uploads are also sent to the **Eversense NOW** app, available on the 
 
 ## Daily Use
 
-13. Apply a fresh adhesive patch each morning and wear the transmitter over the sensor site on your upper arm.
-14. Charge the transmitter daily — no glucose data is collected while it is charging.
-15. Check AAPS for your glucose reading, trend arrows, and alerts.
-16. Monitor placement signal in the plugin settings if readings seem inconsistent.
-17. Calibrate when due — tap the Calibrate button and enter your fingerstick reading.
-18. **E3 only:** if you need to switch back to the official Eversense app temporarily, go to AAPS Settings → CGM and delete the CGM source, then reconnect in the official app.
-19. **E365 only:** if you need to make on-transmitter changes (alert levels, firmware check), you will need to temporarily reinstall the official Eversense app, make your changes, then delete it again before reconnecting to AAPS (see the E365 note above).
+14. Apply a fresh adhesive patch each morning and wear the transmitter over the sensor site on your upper arm.
+15. Charge the transmitter daily — no glucose data is collected while it is charging.
+16. Check AAPS for your glucose reading, trend arrows, and alerts.
+17. Monitor placement signal in the plugin settings if readings seem inconsistent.
+18. Calibrate when due — tap the Calibrate button and enter your fingerstick reading.
+19. **E3 only:** if you need to switch back to the official Eversense app temporarily, go to AAPS Settings → CGM and delete the CGM source, then reconnect in the official app.
+20. **E365 only:** if you need to make on-transmitter changes (alert levels, firmware check), you will need to temporarily reinstall the official Eversense app, make your changes, then delete it again before reconnecting to AAPS (see the E365 note above).
 
 ---
 
@@ -141,3 +156,4 @@ These same uploads are also sent to the **Eversense NOW** app, available on the 
 
 - This branch's Eversense integration is actively evolving. Check the commit history for the latest state before relying on it in a real-world dosing decision.
 - The E365/official-app contention issue is a platform-level Android Bluetooth limitation (only one app can hold an active GATT connection to the transmitter at a time), not a bug specific to either app. There is no way to make two apps share the connection simultaneously for the E365.
+- European 365 support ("Eversense 365 transmitter is European" toggle) is new and pending broader real-world confirmation. See "European (OUS) 365 Transmitters" above.
