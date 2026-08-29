@@ -44,6 +44,7 @@ import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.interfaces.notifications.AapsNotification
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.pump.BolusProgressState
+import app.aaps.core.keys.LongNonKey
 import app.aaps.core.ui.R
 import app.aaps.core.ui.compose.LocalDateUtil
 import app.aaps.core.ui.compose.LocalSnackbarHostState
@@ -232,6 +233,9 @@ fun MainScreen(
                 val activeSceneState by mainViewModel.activeSceneState.collectAsStateWithLifecycle()
                 val sceneExpired by mainViewModel.sceneExpired.collectAsStateWithLifecycle()
                 val masterReachable by mainViewModel.masterReachable.collectAsStateWithLifecycle()
+                // Drives the Eversense post-calibration countdown banner - only ever written by
+                // EversenseCalibrationActivity, so a fresh value already implies Eversense is in use.
+                val eversenseCalibrationSubmittedAt by mainViewModel.preferences.observe(LongNonKey.EversenseLastCalibrationSubmittedAt).collectAsStateWithLifecycle()
                 // Stable pairing signal — hides the mutating nav buttons on an unpaired client.
                 val masterOrPairedClient by mainViewModel.masterOrPairedClient.collectAsStateWithLifecycle()
                 // (Probe-while-offline is now global — see ComposeMainActivity. This screen still reads
@@ -265,6 +269,7 @@ fun MainScreen(
                         onNavigate = onNavigate,
                         onTbrChipClick = mainViewModel::showTbrInfo,
                         onIobChipClick = chipsViewModel::showIobInfo,
+                        eversenseCalibrationSubmittedAt = eversenseCalibrationSubmittedAt,
                         notifications = notifications,
                         onDismissNotification = onDismissNotification,
                         onNotificationActionClick = onNotificationActionClick,

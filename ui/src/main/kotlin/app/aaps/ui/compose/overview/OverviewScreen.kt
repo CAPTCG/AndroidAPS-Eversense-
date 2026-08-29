@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,6 +94,7 @@ fun OverviewScreen(
     queueStatusText: String? = null,
     isPumpCommunicating: Boolean = false,
     onStopBolus: () -> Unit = {},
+    eversenseCalibrationSubmittedAt: Long = 0L,
     modifier: Modifier = Modifier
 ) {
     var showNotificationSheet by remember { mutableStateOf(false) }
@@ -124,46 +126,15 @@ fun OverviewScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isTablet = configuration.smallestScreenWidthDp >= TABLET_MIN_SW_DP && isLandscape
 
-    Box(modifier = modifier.fillMaxSize()) {
-        if (isTablet) {
-            OverviewScreenTablet(
-                profileName = profileName,
-                isProfileModified = isProfileModified,
-                profileProgress = profileProgress,
-                profileSceneManaged = profileSceneManaged,
-                tempTargetText = tempTargetText,
-                tempTargetState = tempTargetState,
-                tempTargetProgress = tempTargetProgress,
-                tempTargetReason = tempTargetReason,
-                tempTargetSceneManaged = tempTargetSceneManaged,
-                runningMode = runningMode,
-                runningModeText = runningModeText,
-                runningModeRemaining = runningModeRemaining,
-                runningModeProgress = runningModeProgress,
-                runningModeSceneManaged = runningModeSceneManaged,
-                tbrState = tbrState,
-                smbEnabled = smbEnabled,
-                isSimpleMode = isSimpleMode,
-                graphViewModel = graphViewModel,
-                chipsViewModel = chipsViewModel,
-                manageViewModel = manageViewModel,
-                statusViewModel = statusViewModel,
-                statusLightsDef = statusLightsDef,
-                onNavigate = onNavigate,
-                onTbrChipClick = onTbrChipClick,
-                onIobChipClick = onIobChipClick,
-                paddingValues = paddingValues,
-                activeSceneState = activeSceneState,
-                sceneExpired = sceneExpired,
-                onEndScene = onEndScene,
-                onDismissScene = onDismissScene,
-                endSceneEnabled = endSceneEnabled,
-                commandsAllowed = commandsAllowed,
-                formatDuration = formatDuration
-            )
-        } else BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            if (isLandscape && maxWidth >= SPLIT_LAYOUT_MIN_WIDTH) {
-                OverviewScreenSplit(
+    // Local function, not an inline lambda: its body is its own scope, so the plain
+    // AnimatedVisibility call inside stays unambiguously BoxScope's overload rather than also
+    // considering the outer Column's — nesting Box directly under Column (a lambda closure,
+    // not a function boundary) makes that call ambiguous between the two.
+    @Composable
+    fun OverviewContent(contentModifier: Modifier) {
+        Box(modifier = contentModifier) {
+            if (isTablet) {
+                OverviewScreenTablet(
                     profileName = profileName,
                     isProfileModified = isProfileModified,
                     profileProgress = profileProgress,
@@ -198,83 +169,129 @@ fun OverviewScreen(
                     commandsAllowed = commandsAllowed,
                     formatDuration = formatDuration
                 )
-            } else {
-                OverviewScreenStacked(
-                    profileName = profileName,
-                    isProfileModified = isProfileModified,
-                    profileProgress = profileProgress,
-                    profileSceneManaged = profileSceneManaged,
-                    tempTargetText = tempTargetText,
-                    tempTargetState = tempTargetState,
-                    tempTargetProgress = tempTargetProgress,
-                    tempTargetReason = tempTargetReason,
-                    tempTargetSceneManaged = tempTargetSceneManaged,
-                    runningMode = runningMode,
-                    runningModeText = runningModeText,
-                    runningModeRemaining = runningModeRemaining,
-                    runningModeProgress = runningModeProgress,
-                    runningModeSceneManaged = runningModeSceneManaged,
-                    tbrState = tbrState,
-                    smbEnabled = smbEnabled,
-                    isSimpleMode = isSimpleMode,
-                    graphViewModel = graphViewModel,
-                    chipsViewModel = chipsViewModel,
-                    manageViewModel = manageViewModel,
-                    statusViewModel = statusViewModel,
-                    statusLightsDef = statusLightsDef,
-                    onNavigate = onNavigate,
-                    onTbrChipClick = onTbrChipClick,
-                    onIobChipClick = onIobChipClick,
-                    paddingValues = paddingValues,
-                    activeSceneState = activeSceneState,
-                    sceneExpired = sceneExpired,
-                    onEndScene = onEndScene,
-                    onDismissScene = onDismissScene,
-                    endSceneEnabled = endSceneEnabled,
-                    commandsAllowed = commandsAllowed,
-                    formatDuration = formatDuration
+            } else BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                if (isLandscape && maxWidth >= SPLIT_LAYOUT_MIN_WIDTH) {
+                    OverviewScreenSplit(
+                        profileName = profileName,
+                        isProfileModified = isProfileModified,
+                        profileProgress = profileProgress,
+                        profileSceneManaged = profileSceneManaged,
+                        tempTargetText = tempTargetText,
+                        tempTargetState = tempTargetState,
+                        tempTargetProgress = tempTargetProgress,
+                        tempTargetReason = tempTargetReason,
+                        tempTargetSceneManaged = tempTargetSceneManaged,
+                        runningMode = runningMode,
+                        runningModeText = runningModeText,
+                        runningModeRemaining = runningModeRemaining,
+                        runningModeProgress = runningModeProgress,
+                        runningModeSceneManaged = runningModeSceneManaged,
+                        tbrState = tbrState,
+                        smbEnabled = smbEnabled,
+                        isSimpleMode = isSimpleMode,
+                        graphViewModel = graphViewModel,
+                        chipsViewModel = chipsViewModel,
+                        manageViewModel = manageViewModel,
+                        statusViewModel = statusViewModel,
+                        statusLightsDef = statusLightsDef,
+                        onNavigate = onNavigate,
+                        onTbrChipClick = onTbrChipClick,
+                        onIobChipClick = onIobChipClick,
+                        paddingValues = paddingValues,
+                        activeSceneState = activeSceneState,
+                        sceneExpired = sceneExpired,
+                        onEndScene = onEndScene,
+                        onDismissScene = onDismissScene,
+                        endSceneEnabled = endSceneEnabled,
+                        commandsAllowed = commandsAllowed,
+                        formatDuration = formatDuration
+                    )
+                } else {
+                    OverviewScreenStacked(
+                        profileName = profileName,
+                        isProfileModified = isProfileModified,
+                        profileProgress = profileProgress,
+                        profileSceneManaged = profileSceneManaged,
+                        tempTargetText = tempTargetText,
+                        tempTargetState = tempTargetState,
+                        tempTargetProgress = tempTargetProgress,
+                        tempTargetReason = tempTargetReason,
+                        tempTargetSceneManaged = tempTargetSceneManaged,
+                        runningMode = runningMode,
+                        runningModeText = runningModeText,
+                        runningModeRemaining = runningModeRemaining,
+                        runningModeProgress = runningModeProgress,
+                        runningModeSceneManaged = runningModeSceneManaged,
+                        tbrState = tbrState,
+                        smbEnabled = smbEnabled,
+                        isSimpleMode = isSimpleMode,
+                        graphViewModel = graphViewModel,
+                        chipsViewModel = chipsViewModel,
+                        manageViewModel = manageViewModel,
+                        statusViewModel = statusViewModel,
+                        statusLightsDef = statusLightsDef,
+                        onNavigate = onNavigate,
+                        onTbrChipClick = onTbrChipClick,
+                        onIobChipClick = onIobChipClick,
+                        paddingValues = paddingValues,
+                        activeSceneState = activeSceneState,
+                        sceneExpired = sceneExpired,
+                        onEndScene = onEndScene,
+                        onDismissScene = onDismissScene,
+                        endSceneEnabled = endSceneEnabled,
+                        commandsAllowed = commandsAllowed,
+                        formatDuration = formatDuration
+                    )
+                }
+            }
+
+            // Calculation progress (IOB / graph data). Overlaid on top of content so it never reflows
+            // the layout — previously a flow child of the content Column which caused the screen to jump.
+            AnimatedVisibility(
+                visible = calcProgress < 100,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(paddingValues)
+                    .fillMaxWidth()
+            ) {
+                LinearProgressIndicator(
+                    progress = { calcProgress / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
                 )
             }
-        }
 
-        // Calculation progress (IOB / graph data). Overlaid on top of content so it never reflows
-        // the layout — previously a flow child of the content Column which caused the screen to jump.
-        AnimatedVisibility(
-            visible = calcProgress < 100,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(paddingValues)
-                .fillMaxWidth()
-        ) {
-            LinearProgressIndicator(
-                progress = { calcProgress / 100f },
+            PumpActivityFab(
+                visible = showPumpFab,
+                bolusState = bolusState,
+                onClick = { showPumpActivityDialog = true },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(paddingValues)
+                    .padding(end = 16.dp, bottom = 128.dp + fabBottomOffset)
+            )
+
+            NotificationFab(
+                notificationCount = notifications.size,
+                highestLevel = notifications.minByOrNull { it.level.ordinal }?.level,
+                onClick = { showNotificationSheet = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(paddingValues)
+                    .padding(end = 16.dp, bottom = 72.dp + fabBottomOffset)
             )
         }
+    }
 
-        PumpActivityFab(
-            visible = showPumpFab,
-            bolusState = bolusState,
-            onClick = { showPumpActivityDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(paddingValues)
-                .padding(end = 16.dp, bottom = 128.dp + fabBottomOffset)
+    Column(modifier = modifier.fillMaxSize()) {
+        EversenseCalibrationBanner(
+            submittedAtMs = eversenseCalibrationSubmittedAt,
+            modifier = Modifier.padding(top = paddingValues.calculateTopPadding())
         )
-
-        NotificationFab(
-            notificationCount = notifications.size,
-            highestLevel = notifications.minByOrNull { it.level.ordinal }?.level,
-            onClick = { showNotificationSheet = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(paddingValues)
-                .padding(end = 16.dp, bottom = 72.dp + fabBottomOffset)
-        )
+        OverviewContent(contentModifier = Modifier.weight(1f).fillMaxWidth())
     }
 
     if (showPumpActivityDialog) {

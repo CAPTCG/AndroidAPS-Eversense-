@@ -333,4 +333,6 @@
     <string name="cal_precheck_delta_too_high">Glucose is changing too fast (Δ %1$s %3$s per 5 min, limit %2$s). Wait for stability.</string>
     <string name="cal_precheck_mark_sensor_change">Mark sensor change</string>
 
+    <string name="eversense_calibration_in_progress" comment="%1$s=countdown timer, e.g. 14:32. Example: Calibration in progress (14:32)">Calibration in progress (%1$s)</string>
+
 </resources>
