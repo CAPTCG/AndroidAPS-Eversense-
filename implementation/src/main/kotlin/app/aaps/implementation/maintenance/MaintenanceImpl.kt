@@ -147,23 +147,17 @@ class MaintenanceImpl @Inject constructor(
     }
 
     /**
-     * Eversense writes its own log under EXT_FILES_DIR/AndroidAPS/eversense (see
-     * EversenseLogger.kt's EXT_FILES_DIR="/sdcard/AndroidAPS/eversense"). loggerUtils.logDirectory
-     * is the MAIN app's EXT_FILES_DIR (app/src/main/assets/logback.xml), which is "/sdcard" - NOT
-     * "/sdcard/AndroidAPS" (there's no directory-per-app-log convention here; AndroidAPS.log itself
-     * lives directly in EXT_FILES_DIR). So "AndroidAPS/eversense" joined onto logDirectory is the
-     * correct, real path - capped independently by amount so Eversense files can't get crowded out
-     * of the AndroidAPS list.
-     *
-     * CORRECTION: a previous version of this comment/fix incorrectly assumed logDirectory was
-     * already "/sdcard/AndroidAPS" and changed this join to plain "eversense", which pointed at
-     * "/sdcard/eversense" - wrong, and unverified against the real logback.xml. Reverted. The
-     * original "Eversense.log missing from every export" report is still unexplained by a path
-     * bug here; see EversenseLogger.kt for whether the file is even being created at all under
-     * scoped storage.
+     * Eversense writes its own log to a fixed path, "/sdcard/AndroidAPS/eversense" (see the
+     * EXT_FILES_DIR property in EversenseLogger.kt's LOGBACK_XML) - NOT under loggerUtils.logDirectory,
+     * which on modern Android resolves to the app's scoped external-files dir
+     * (.../Android/data/<package>/files), a different location entirely. Using
+     * loggerUtils.logDirectory here silently never found the files, so Eversense.log has never
+     * actually been included in a log export. If EversenseLogger.kt's EXT_FILES_DIR ever changes,
+     * update the path below to match.
+     * Capped independently by amount so Eversense files can't get crowded out of the AndroidAPS list.
      */
     private fun getEversenseLogFiles(amount: Int): List<File> {
-        val eversenseDir = File(loggerUtils.logDirectory, "AndroidAPS/eversense")
+        val eversenseDir = File("/sdcard/AndroidAPS/eversense")
         val files = eversenseDir.listFiles { _: File?, name: String ->
             (name.startsWith("Eversense")
                 && (name.endsWith(".log")
