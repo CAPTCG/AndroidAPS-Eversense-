@@ -11,6 +11,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.Toolbar
 import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.keys.LongNonKey
+import app.aaps.core.keys.interfaces.Preferences
 import androidx.appcompat.app.AppCompatActivity
 import dagger.hilt.android.AndroidEntryPoint
 import app.aaps.plugins.source.R
@@ -33,6 +35,7 @@ class EversenseCalibrationActivity : AppCompatActivity() {
 
     @Inject lateinit var profileUtil: ProfileUtil
     @Inject lateinit var eversenseCGM: EversenseCGMPlugin
+    @Inject lateinit var preferences: Preferences
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -140,6 +143,8 @@ class EversenseCalibrationActivity : AppCompatActivity() {
             if (success) {
                 EversenseLogger.info(TAG, "Triggering fullSync after successful calibration")
                 eversenseCGM.triggerFullSync(force = true)
+                // Drives the home-screen "Calibration in progress" countdown banner.
+                preferences.put(LongNonKey.EversenseLastCalibrationSubmittedAt, System.currentTimeMillis())
             }
             runOnUiThread {
                 if (success) {
