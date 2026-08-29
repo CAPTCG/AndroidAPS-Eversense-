@@ -27,7 +27,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.aaps.core.objects.extensions.tickerFlow
 import app.aaps.core.ui.compose.AapsSpacing
-import app.aaps.core.ui.compose.ExcludeFromJacocoGeneratedReport
 import app.aaps.ui.R
 
 /** 15 minutes, matching the official Eversense app's post-calibration countdown bar. */
@@ -91,7 +90,6 @@ fun EversenseCalibrationBanner(
 
 // --- Previews ---
 
-@ExcludeFromJacocoGeneratedReport
 @Preview(showBackground = true)
 @Composable
 private fun EversenseCalibrationBannerPreview() {
@@ -102,7 +100,6 @@ private fun EversenseCalibrationBannerPreview() {
     }
 }
 
-@ExcludeFromJacocoGeneratedReport
 @Preview(showBackground = true)
 @Composable
 private fun EversenseCalibrationBannerHiddenPreview() {
