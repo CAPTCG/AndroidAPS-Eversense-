@@ -734,6 +734,7 @@ val authSession = networkExecutor.submit<Any?> {
 
                 val fleet = networkExecutor.submit<Any?> {
                     EversenseHttp365Util.getFleetSecretV2(
+                        preferences = preferences,
                         accessToken = authSession.access_token,
                         serialNumber = whoAmI.serialNumber,
                         nonce = whoAmI.nonce,
