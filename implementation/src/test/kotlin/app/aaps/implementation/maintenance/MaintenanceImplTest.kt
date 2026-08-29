@@ -38,16 +38,18 @@ class MaintenanceImplTest : TestBaseWithProfile() {
             "Eversense.log",
         ).inOrder()
         logs = sut.getLogFiles(10)
-        // 4 AndroidAPS files + 1 Eversense.log (src/test/assets/logger/AndroidAPS/eversense/) -
+        // 4 AndroidAPS files + 1 Eversense.log (src/test/assets/logger/eversense/) -
         // see the getEversenseLogFiles test below for the real on-device path this mirrors.
         assertThat(logs).hasSize(5)
     }
 
-    @Test fun `getLogFiles includes Eversense's own log file from its AndroidAPS-eversense subdirectory`() {
-        // getEversenseLogFiles() joins loggerUtils.logDirectory ("/sdcard" on device - see
-        // app/src/main/assets/logback.xml's EXT_FILES_DIR - AndroidAPS.log itself lives directly
-        // there, not under an "AndroidAPS/" subfolder) with "AndroidAPS/eversense", matching
-        // EversenseLogger.kt's own hardcoded "/sdcard/AndroidAPS/eversense/Eversense.log".
+    @Test fun `getLogFiles includes Eversense's own log file from its eversense subdirectory`() {
+        // getEversenseLogFiles() joins loggerUtils.logDirectory with "eversense".
+        // loggerUtils.logDirectory is NOT "/sdcard" on a real device - confirmed live via a real
+        // user's AndroidAPS.log: it resolves to the app's own scoped external-files directory
+        // (.../Android/data/<package>/files), which needs no extra permission to write to.
+        // EversenseCGMPlugin's init block passes that same directory (+ "eversense") to
+        // EversenseLogger.configure(), so this join matches where the file is actually written.
         val logs = sut.getLogFiles(10)
 
         assertThat(logs.map { it.name }).contains("Eversense.log")
