@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
@@ -135,11 +136,11 @@ fun OverviewScreen(
     // not a function boundary) makes that call ambiguous between the two.
     @Composable
     fun OverviewContent(contentModifier: Modifier) {
-        // Top clearance for the app bar is already handled once, above, by offsetting the
-        // banner itself (see paddingValues.calculateTopPadding() below) - this content now
-        // starts below that instead of at y=0 the way it used to. Re-applying paddingValues'
-        // top component here too, on top of that, was doubling the gap whenever the banner was
-        // visible. Bottom/side clearance (nav bar etc.) is untouched and still needed as-is.
+        // Top clearance for the app bar is already handled once, above, by the unconditional
+        // Spacer before the calibration banner - this content now starts below that instead of
+        // at y=0 the way it used to. Re-applying paddingValues' top component here too, on top
+        // of that, was doubling the gap whenever the banner was visible. Bottom/side clearance
+        // (nav bar etc.) is untouched and still needed as-is.
         val layoutDirection = LocalLayoutDirection.current
         val contentPaddingValues = PaddingValues(
             start = paddingValues.calculateStartPadding(layoutDirection),
@@ -302,10 +303,15 @@ fun OverviewScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        EversenseCalibrationBanner(
-            submittedAtMs = eversenseCalibrationSubmittedAt,
-            modifier = Modifier.padding(top = paddingValues.calculateTopPadding())
-        )
+        // Reserves the toolbar's clearance unconditionally, regardless of whether the banner
+        // below is visible - the caller-supplied modifier on EversenseCalibrationBanner is
+        // applied inside its AnimatedVisibility content lambda, which composes nothing at all
+        // (not even a zero-size placeholder) while never-shown, so a Modifier.padding() on the
+        // banner itself doesn't reserve any space in that (most common) case. A Spacer here is
+        // unconditional either way, so the toolbar is cleared whether the banner is showing,
+        // hidden, or mid-transition, and OverviewContent needs no top padding of its own.
+        Spacer(modifier = Modifier.height(paddingValues.calculateTopPadding()))
+        EversenseCalibrationBanner(submittedAtMs = eversenseCalibrationSubmittedAt)
         OverviewContent(contentModifier = Modifier.weight(1f).fillMaxWidth())
     }
 
