@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.aaps.core.data.model.ActiveSceneState
@@ -132,6 +135,18 @@ fun OverviewScreen(
     // not a function boundary) makes that call ambiguous between the two.
     @Composable
     fun OverviewContent(contentModifier: Modifier) {
+        // Top clearance for the app bar is already handled once, above, by offsetting the
+        // banner itself (see paddingValues.calculateTopPadding() below) - this content now
+        // starts below that instead of at y=0 the way it used to. Re-applying paddingValues'
+        // top component here too, on top of that, was doubling the gap whenever the banner was
+        // visible. Bottom/side clearance (nav bar etc.) is untouched and still needed as-is.
+        val layoutDirection = LocalLayoutDirection.current
+        val contentPaddingValues = PaddingValues(
+            start = paddingValues.calculateStartPadding(layoutDirection),
+            top = 0.dp,
+            end = paddingValues.calculateEndPadding(layoutDirection),
+            bottom = paddingValues.calculateBottomPadding()
+        )
         Box(modifier = contentModifier) {
             if (isTablet) {
                 OverviewScreenTablet(
@@ -160,7 +175,7 @@ fun OverviewScreen(
                     onNavigate = onNavigate,
                     onTbrChipClick = onTbrChipClick,
                     onIobChipClick = onIobChipClick,
-                    paddingValues = paddingValues,
+                    paddingValues = contentPaddingValues,
                     activeSceneState = activeSceneState,
                     sceneExpired = sceneExpired,
                     onEndScene = onEndScene,
@@ -197,7 +212,7 @@ fun OverviewScreen(
                         onNavigate = onNavigate,
                         onTbrChipClick = onTbrChipClick,
                         onIobChipClick = onIobChipClick,
-                        paddingValues = paddingValues,
+                        paddingValues = contentPaddingValues,
                         activeSceneState = activeSceneState,
                         sceneExpired = sceneExpired,
                         onEndScene = onEndScene,
@@ -233,7 +248,7 @@ fun OverviewScreen(
                         onNavigate = onNavigate,
                         onTbrChipClick = onTbrChipClick,
                         onIobChipClick = onIobChipClick,
-                        paddingValues = paddingValues,
+                        paddingValues = contentPaddingValues,
                         activeSceneState = activeSceneState,
                         sceneExpired = sceneExpired,
                         onEndScene = onEndScene,
@@ -253,7 +268,7 @@ fun OverviewScreen(
                 exit = fadeOut(),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(paddingValues)
+                    .padding(contentPaddingValues)
                     .fillMaxWidth()
             ) {
                 LinearProgressIndicator(
@@ -270,7 +285,7 @@ fun OverviewScreen(
                 onClick = { showPumpActivityDialog = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(paddingValues)
+                    .padding(contentPaddingValues)
                     .padding(end = 16.dp, bottom = 128.dp + fabBottomOffset)
             )
 
@@ -280,7 +295,7 @@ fun OverviewScreen(
                 onClick = { showNotificationSheet = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(paddingValues)
+                    .padding(contentPaddingValues)
                     .padding(end = 16.dp, bottom = 72.dp + fabBottomOffset)
             )
         }
