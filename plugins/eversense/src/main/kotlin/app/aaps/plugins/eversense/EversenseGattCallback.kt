@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.edit
+import app.aaps.plugins.eversense.enums.EversenseAlarm
 import app.aaps.plugins.eversense.enums.EversenseSecurityType
 import app.aaps.plugins.eversense.exceptions.EversenseWriteException
 import app.aaps.plugins.eversense.packets.Eversense365Communicator
@@ -551,6 +552,12 @@ class EversenseGattCallback(
             packet.appendData(data.toUByteArray())
             val response = packet.parseResponse() ?: run {
                 EversenseLogger.warning(TAG, "Push alarm packet too short -> skipping")
+                return
+            }
+            if (response.alarm.code == EversenseAlarm.UNKNOWN) {
+                // Unrecognized/bogus codes (e.g. the removed TxDocked/TxUndocked 68/69) must not
+                // surface as a real alarm - matches the upstream iOS EversenseKit fix.
+                EversenseLogger.warning(TAG, "Received unknown push alarm code: ${response.alarm.codeRaw}")
                 return
             }
             EversenseLogger.info(TAG, "Push alarm received: ${response.alarm.code.title}")
