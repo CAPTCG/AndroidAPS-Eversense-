@@ -127,7 +127,14 @@ data class ICfg(
             // loop into overdelivery. These bounds are MATH-validity floors only, NOT the medical limits
             // (which are enforced upstream): legitimate peaks below HardLimits.LIMIT_PEAK (e.g. 30 min) and
             // any dia >= MIN_DIA are preserved unchanged; only degenerate values are sanitized.
-            val td = (dia * 60).coerceAtLeast(MIN_DIA_MINUTES)
+            //
+            // Two different floors, not one: a genuinely corrupt/sentinel config (insulinEndTime <= 0)
+            // must still floor to MIN_DIA_MINUTES_SENTINEL (5h) so a real outstanding bolus is never
+            // silently zeroed. A real, even if short, DIA (e.g. Afrezza's 1.0-2.0h) only needs the much
+            // lower MIN_DIA_MINUTES floor to guard against literal zero/negative math inputs - flooring
+            // it to 5h would wrongly stretch inhaled insulin's fast IOB taper.
+            val diaFloorMinutes = if (insulinEndTime > 0) MIN_DIA_MINUTES else MIN_DIA_MINUTES_SENTINEL
+            val td = (dia * 60).coerceAtLeast(diaFloorMinutes)
             val tp = peak.toDouble().coerceIn(MIN_PEAK_MINUTES, td / 2.0 - 1.0)
             // force the IOB to 0 if over DIA hours have passed
             if (t < td) {
@@ -144,8 +151,8 @@ data class ICfg(
     companion object {
         // Math-validity floors for iobCalcForTreatment. They only engage for corrupt/degenerate iCfg
         // and are no-ops for real configs; they are NOT the medical HardLimits.
-        private const val MIN_DIA_MINUTES = 30.0 // 0.5 h math-validity floor; only sanitizes degenerate DIA <= 0, preserves legitimate short inhaled DIA (e.g. Afrezza 1.0-2.0 h)
-        //private const val MIN_DIA_MINUTES = 300.0 // 5 h (mirrors HardLimits.MIN_DIA); floors corrupt/sentinel DIA <= 0
+        private const val MIN_DIA_MINUTES = 30.0 // 0.5 h; guards a real (even short inhaled, e.g. Afrezza 1.0-2.0 h) DIA against literal zero/negative math inputs
+        private const val MIN_DIA_MINUTES_SENTINEL = 300.0 // 5 h (mirrors HardLimits.MIN_DIA); floors a corrupt/sentinel config (insulinEndTime <= 0) so it never silently zeros a real bolus's IOB
         private const val MIN_PEAK_MINUTES = 1.0  // just keeps tp > 0; real peaks (incl. sub-MIN_PEAK like 30 min) pass through
     }
 }
