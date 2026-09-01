@@ -263,7 +263,7 @@ class EversensePlugin @Inject constructor(
             EversenseIntentKey.EversenseDocumentation.withClick {
                 val intent = Intent(
                     Intent.ACTION_VIEW,
-                    "https://github.com/CAPTCG/AndroidAPS-Eversense-Afrezza-Docs/blob/main/README.md".toUri()
+                    "https://github.com/CAPTCG/AndroidAPS-Eversense-/blob/docs/README.md".toUri()
                 )
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
