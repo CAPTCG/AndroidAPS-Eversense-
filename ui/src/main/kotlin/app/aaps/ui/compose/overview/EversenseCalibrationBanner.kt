@@ -36,8 +36,9 @@ private const val CALIBRATION_COUNTDOWN_MS = 15 * 60 * 1000L
  * Home-screen banner mirroring the official Eversense app's post-calibration countdown bar (see
  * the feature request's reference screenshot). Renders nothing once [submittedAtMs] is more than
  * 15 minutes old, or is 0 (the never-submitted default) — callers don't need a separate "is
- * Eversense in use" gate: EversenseLastCalibrationSubmittedAt is only ever written by
- * EversenseCalibrationActivity on a successful submission, so a fresh value already implies
+ * Eversense in use" gate: EversenseLastCalibrationSubmittedAt is only ever written on a successful
+ * calibration submission (both the Settings -> Eversense -> Calibration screen and the
+ * quick-launch "Eversense Calibration" dialog write it), so a fresh value already implies
  * Eversense is the one in use.
  */
 @Composable
