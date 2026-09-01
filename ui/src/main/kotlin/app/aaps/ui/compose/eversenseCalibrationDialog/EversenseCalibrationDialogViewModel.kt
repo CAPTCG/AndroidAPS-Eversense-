@@ -56,7 +56,8 @@ class EversenseCalibrationDialogViewModel @Inject constructor(
         _uiState.update {
             EversenseCalibrationDialogUiState(
                 units = units,
-                bgRange = if (isMmol) 2.0..30.0 else 36.0..500.0,
+                // Eversense's accepted fingerstick calibration range is 40-400 mg/dL.
+                bgRange = if (isMmol) 2.2..22.2 else 40.0..400.0,
                 bgStep = if (isMmol) 0.1 else 1.0,
                 bgDecimalPlaces = if (isMmol) 1 else 0,
                 notConnected = !eversenseCalibrationSource.isConnected()
