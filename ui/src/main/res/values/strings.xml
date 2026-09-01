@@ -335,4 +335,8 @@
 
     <string name="eversense_calibration_in_progress" comment="%1$s=countdown timer, e.g. 14:32. Example: Calibration in progress (14:32)">Calibration in progress (%1$s)</string>
 
+    <!-- Eversense Calibration dialog (quick-launch) -->
+    <string name="eversense_calibration_not_connected">Not connected — reconnecting to the transmitter…</string>
+    <string name="eversense_calibration_send_failed">Calibration failed — check the transmitter connection and try again</string>
+
 </resources>

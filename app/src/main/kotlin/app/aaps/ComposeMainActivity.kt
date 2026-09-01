@@ -1132,6 +1132,7 @@ class ComposeMainActivity : AppCompatActivity() {
             ElementType.CGM_DEX                 -> dexcomBoyda.dexcomPackages().forEach { openCgmApp(it) }
 
             ElementType.CALIBRATION             -> navController.navigate(AppRoute.CalibrationDialog.route)
+            ElementType.EVERSENSE_CALIBRATION   -> navController.navigate(AppRoute.EversenseCalibrationDialog.route)
 
             // Careportal
             ElementType.BG_CHECK                -> navController.navigate(AppRoute.CareDialog.createRoute(CareportalEventType.BGCHECK.ordinal))
