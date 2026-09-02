@@ -148,7 +148,14 @@ class EversenseCGMPlugin(
                 EversenseLogger.info(TAG, "Connecting to supplied device: ${device.name}")
                 preferences.edit { putString(StorageKeys.REMOTE_DEVICE_KEY, device.address) }
                 EversenseLogger.info(TAG, "Saved device address for auto-reconnect: ${device.address}")
-                device.connectGatt(context, true, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                // autoConnect=false here, unlike the stored-device branch below: this device was
+                // just found via active scan and has never been bonded/connected before.
+                // autoConnect=true tells Android to use its background "connect whenever the
+                // device becomes available" mechanism, meant for reconnecting to an already-known
+                // device - for a brand-new, never-bonded device it's a well-documented way to get
+                // neither a GATT callback nor a pairing prompt, silently, indefinitely. false forces
+                // an immediate direct connection attempt instead.
+                device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
                 true
             } else {
                 val address = preferences.getString(StorageKeys.REMOTE_DEVICE_KEY, null) ?: run {
