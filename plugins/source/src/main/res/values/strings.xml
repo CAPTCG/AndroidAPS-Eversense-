@@ -83,6 +83,8 @@
     <string name="eversense_scan_title">Select Eversense transmitter</string>
     <string name="eversense_scan_cancel">Cancel</string>
     <string name="eversense_scan_unknown_device">Unknown device</string>
+    <string name="eversense_change_transmitter">Change Transmitter</string>
+    <string name="eversense_change_transmitter_confirm">Forget this transmitter and scan for a new one? You\'ll need to select the new transmitter from the scan results.</string>
     <string name="eversense_scan_in_progress">Scanning for Eversense devices (10 seconds)…</string>
     <!-- Calibration activity -->
     <string name="eversense_calibration_ready">Ready to calibrate</string>
