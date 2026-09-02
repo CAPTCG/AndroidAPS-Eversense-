@@ -82,6 +82,10 @@ class EversenseStatusActivity : AppCompatActivity(), EversenseWatcher {
             handleConnectTap()
         }
 
+        findViewById<Button>(R.id.eversense_btn_change_transmitter).setOnClickListener {
+            handleChangeTransmitterTap()
+        }
+
         findViewById<Button>(R.id.eversense_btn_sync).setOnClickListener {
             if (eversense.isConnected()) {
                 ioScope.launch { eversense.triggerFullSync(force = true) }
@@ -157,6 +161,24 @@ class EversenseStatusActivity : AppCompatActivity(), EversenseWatcher {
                 showDeviceSelectionDialog()
             }
         }
+    }
+
+    // Forgets the currently paired transmitter's stored MAC address and re-scans - the only way
+    // to switch to a new/replacement transmitter. Without this, handleConnectTap() always finds a
+    // stored device and just keeps reconnecting to it (see connect()'s "hasStoredDevice" branch),
+    // so a swapped-in transmitter with a different address is never discoverable through the UI.
+    private fun handleChangeTransmitterTap() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.eversense_change_transmitter))
+            .setMessage(getString(R.string.eversense_change_transmitter_confirm))
+            .setPositiveButton(getString(R.string.eversense_change_transmitter)) { _, _ ->
+                if (eversense.isConnected()) eversense.disconnect()
+                eversense.clearStoredDevice()
+                updateStatus()
+                showDeviceSelectionDialog()
+            }
+            .setNegativeButton(getString(R.string.eversense_scan_cancel), null)
+            .show()
     }
 
     private fun showDeviceSelectionDialog() {
