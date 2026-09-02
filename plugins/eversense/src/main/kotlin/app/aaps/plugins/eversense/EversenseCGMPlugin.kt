@@ -22,6 +22,7 @@ import app.aaps.plugins.eversense.packets.e3.GetSignalStrengthRawPacket
 import app.aaps.plugins.eversense.packets.e365.GetSignalStrengthPacket
 import app.aaps.plugins.eversense.packets.e365.SetBloodGlucosePointPacket365
 import app.aaps.plugins.eversense.enums.CalibrationReadiness
+import app.aaps.plugins.eversense.util.EversenseCrypto365Util
 import app.aaps.plugins.eversense.util.EversenseLogger
 import app.aaps.plugins.eversense.util.EversenseScanner
 import app.aaps.plugins.eversense.util.StorageKeys
@@ -148,6 +149,16 @@ class EversenseCGMPlugin(
                 EversenseLogger.info(TAG, "Connecting to supplied device: ${device.name}")
                 preferences.edit { putString(StorageKeys.REMOTE_DEVICE_KEY, device.address) }
                 EversenseLogger.info(TAG, "Saved device address for auto-reconnect: ${device.address}")
+                // A device picked from the scan-and-pick dialog is, by definition, a different
+                // physical transmitter than whatever the "shortcut auth" session key was
+                // negotiated with (canUseShortcut() is a plain persisted flag, not tied to any
+                // particular transmitter's identity) - so the cached shortcut is guaranteed
+                // invalid here. Without this, the 365 auth flow tries it anyway, gets rejected by
+                // the new transmitter, and only recovers after SHORTCUT_FAIL_THRESHOLD (3) failed
+                // connection attempts. Force a full WhoAmI + DMS login + fleet cert handshake on
+                // the very first attempt against a newly-selected device instead of waiting for
+                // that self-healing to kick in.
+                EversenseCrypto365Util(preferences).disallowUseShortcut()
                 // autoConnect=false here, unlike the stored-device branch below: this device was
                 // just found via active scan and has never been bonded/connected before.
                 // autoConnect=true tells Android to use its background "connect whenever the
