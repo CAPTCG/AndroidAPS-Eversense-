@@ -20,7 +20,7 @@ If you'd rather merge this Eversense support into your own existing AndroidAPS c
 
     git remote add eversense https://github.com/CAPTCG/AndroidAPS-Eversense-.git
     git fetch eversense
-    git merge eversense/master
+    git merge eversense/european-region-support
 
 This is a real three-way git merge, not a patch application — it will correctly integrate with whatever state your own checkout is in, including any future upstream AndroidAPS changes, as long as you keep this repo's branch itself periodically updated against upstream `dev`.
 
