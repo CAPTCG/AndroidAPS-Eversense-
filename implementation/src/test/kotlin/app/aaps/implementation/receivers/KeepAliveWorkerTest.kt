@@ -248,17 +248,36 @@ class KeepAliveWorkerTest : TestBaseWithProfile() {
     }
 
     @Test
-    fun `checkPump does nothing when there is no requested profile`() = runTest {
+    fun `checkPump asks for a profile change but not a status read when there is no requested profile and the connection is fresh`() = runTest {
         // Arrange
         worker = createWorker()
         whenever(profileFunction.getRequestedProfile()).thenReturn(null)
+        testPumpPlugin.lastData = now // fresh -> status not outdated
 
         // Act
         worker.checkPump()
 
         // Assert
         verify(commandQueue, never()).readStatus(any())
-        verify(mockedRxBus, never()).send(any<EventProfileChangeRequested>())
+        verify(mockedRxBus).send(any<EventProfileChangeRequested>())
+    }
+
+    @Test
+    fun `checkPump still requests status when there is no requested profile and the connection is outdated`() = runTest {
+        // Arrange - this is the Florian case: a temporary percentage profile switch ran out while
+        // the app was asleep, so there is no requested profile, but the pump connection is stale
+        // and must still be refreshed to notice the pump has resumed.
+        worker = createWorker()
+        whenever(profileFunction.getRequestedProfile()).thenReturn(null)
+        whenever(rh.gs(app.aaps.core.ui.R.string.keepalive_status_outdated)).thenReturn("status outdated")
+        testPumpPlugin.lastData = now - T.mins(20).msecs()
+
+        // Act
+        worker.checkPump()
+
+        // Assert
+        verify(commandQueue).readStatus("status outdated")
+        verify(mockedRxBus).send(any<EventProfileChangeRequested>())
     }
 
     @Test

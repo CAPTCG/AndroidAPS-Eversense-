@@ -243,13 +243,17 @@ class KeepAliveWorker @AssistedInject constructor(
     @VisibleForTesting
     suspend fun checkPump() {
         val pump = activePlugin.activePump
-        val ps = profileFunction.getRequestedProfile() ?: return
-        val requestedProfile = ProfileSealed.PS(ps, activePlugin)
+        // getRequestedProfile() can be null. One real case: a temporary percentage profile switch
+        // just ran out while the app was asleep (see ProfileSwitchExpiryScheduler). We must not
+        // just give up here: the pump connection can still be stale and needs a refresh, and the
+        // "pump unreachable" alarm still needs to work, even with no profile to compare basal to.
+        val ps = profileFunction.getRequestedProfile()
+        val requestedProfile = ps?.let { ProfileSealed.PS(it, activePlugin) }
         val runningProfile = profileFunction.getProfile()
         val lastConnection = pump.lastDataTime.value
         val now = dateUtil.now()
         val isStatusOutdated = lastConnection + STATUS_UPDATE_FREQUENCY < now
-        val isBasalOutdated = abs(requestedProfile.getBasal() - ch.fromPump(pump.baseBasalRate)) > pump.pumpDescription.basalStep
+        val isBasalOutdated = requestedProfile != null && abs(requestedProfile.getBasal() - ch.fromPump(pump.baseBasalRate)) > pump.pumpDescription.basalStep
         aapsLogger.debug(LTag.CORE, "Last connection: " + dateUtil.dateAndTimeString(lastConnection))
         // Sometimes it can happen that keepalive is not triggered every 5 minutes as it should.
         // In some cases, it may not even have been started at all.
@@ -268,6 +272,15 @@ class KeepAliveWorker @AssistedInject constructor(
         }
         if (runningMode == RM.Mode.DISCONNECTED_PUMP) {
             // do nothing if pump is disconnected
+        } else if (requestedProfile == null) {
+            // No ProfileSwitch covers right now, so we cannot compare basal rates. Still ask for a
+            // profile change (in case one becomes available), and still refresh a stale pump
+            // connection: this is exactly what tells AAPS the pump has resumed after a suspend.
+            rxBus.send(EventProfileChangeRequested())
+            if (isStatusOutdated && !pump.isBusy()) {
+                lastReadStatus = now
+                commandQueue.readStatus(rh.gs(app.aaps.core.ui.R.string.keepalive_status_outdated))
+            }
         } else if (
             runningProfile == null ||
             (
