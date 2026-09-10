@@ -16,6 +16,7 @@ import app.aaps.pump.omnipod.common.bledriver.pod.response.PodInfoActivationTime
 import app.aaps.pump.omnipod.common.bledriver.pod.response.PodInfoTriggeredAlertsResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.SetUniqueIdResponse
 import app.aaps.pump.omnipod.common.bledriver.pod.response.VersionResponse
+import app.aaps.pump.omnipod.common.bledriver.comm.O5IdRotation
 import java.io.Serializable
 import java.util.Calendar
 import java.util.EnumSet
@@ -56,6 +57,8 @@ interface O5PodStateManager {
 
     /** The pod's own id, once paired. */
     var podId: Long?
+
+    var nextPodId: Long?
 
     /** The pod's long-term key, once paired. Null until [updateFromPairing] is called. */
     var ltk: ByteArray?
@@ -169,7 +172,16 @@ interface O5PodStateManager {
          *  .deliverBasalCorrection] issues - excluded from [cumulativeBolusPulsesDelivered]
          *  tracking so it counts toward delivered *basal* insulin, not bolus insulin
          *  (the whole point of the correction is to true up basal drift). */
-        val isBasalCorrection: Boolean = false
+        val isBasalCorrection: Boolean = false,
+        /** True once a bolus record has been written to pumpSync for this dose. If the pod turns
+         *  out never to have received the command, a zero-amount record must be synced to cancel
+         *  the earlier one out - without this flag we would write that correction even when no
+         *  record was ever made. */
+        val bolusRecordExpected: Boolean = false,
+        /** Sticky: set once the pod's delivery status showed the dose running. The sequence-number
+         *  check alone can read as "not received" on a later pass, which would wrongly discard a
+         *  dose the pod really is delivering. */
+        val confirmedByStatus: Boolean = false
     ) : Serializable
 
     // -- read-only pod status, populated from VersionResponse / DefaultStatusResponse ----
@@ -187,7 +199,9 @@ interface O5PodStateManager {
      * Dash driver's `isPodKaput`.
      */
     val isPodKaput: Boolean
-        get() = podStatus in arrayOf(PodStatus.ALARM, PodStatus.DEACTIVATED)
+        get() = podStatus in arrayOf(PodStatus.ALARM, PodStatus.DEACTIVATED) || isPodActivationTimeExceeded
+    val isPodActivationTimeExceeded: Boolean
+        get() = podStatus?.isActivationTimeExceeded() == true
     val firmwareVersion: SoftwareVersion?
     val bleVersion: SoftwareVersion?
     val lotNumber: Long?
@@ -313,6 +327,8 @@ interface O5PodStateManager {
 
     fun updateFromPairing(controllerId: Long, podId: Long, pairResult: PairResult)
 
+    fun completeBolus(startedAt: Long, requestedUnits: Double, deliveredUnits: Double, deliveredPulses: Short?)
+
     fun reset()
 }
 
@@ -338,6 +354,7 @@ class InMemoryO5PodStateManager : O5PodStateManager {
     @Volatile override var bluetoothAddress: String? = null
     @Volatile override var controllerId: Long? = null
     @Volatile override var podId: Long? = null
+    @Volatile override var nextPodId: Long? = null
     @Volatile override var ltk: ByteArray? = null
     @Volatile override var msgSequenceNumber: Byte = 1
 
@@ -499,13 +516,30 @@ class InMemoryO5PodStateManager : O5PodStateManager {
         lastStatusResponseReceived = System.currentTimeMillis()
     }
 
+    @Synchronized
+    override fun completeBolus(startedAt: Long, requestedUnits: Double, deliveredUnits: Double, deliveredPulses: Short?) {
+        val alreadyCompleted = lastBolusStartTime == startedAt && lastBolusDeliveredUnits != null
+        if (!alreadyCompleted && deliveredPulses != null) {
+            cumulativeBolusPulsesDelivered = ((cumulativeBolusPulsesDelivered ?: 0) + deliveredPulses).toShort()
+        }
+        lastBolusStartTime = startedAt
+        lastBolusRequestedUnits = requestedUnits
+        lastBolusDeliveredUnits = deliveredUnits
+        if (pendingDoseCommand?.startedAt == startedAt) {
+            pendingDoseCommand = null
+        }
+    }
+
     override fun reset() {
+        val retainedControllerId = controllerId
+        val retainedNextPodId = podId?.let(O5IdRotation::nextPodId) ?: nextPodId
         bluetoothConnectionState = O5PodStateManager.BluetoothConnectionState.DISCONNECTED
         connectionAttemptsCounter.set(0)
         successfulConnectionsCounter.set(0)
         bluetoothAddress = null
-        controllerId = null
+        controllerId = retainedControllerId
         podId = null
+        nextPodId = retainedNextPodId
         ltk = null
         msgSequenceNumber = 1
         eapAkaSequenceNumber = 0

@@ -175,6 +175,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setSequenceNumber(nextSeq())
                     .build()
                 bleManager.sendCommand(cmd, VersionResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.GOT_POD_VERSION
             }
 
@@ -194,6 +195,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setInitializationTime(Date())
                     .build()
                 bleManager.sendCommand(cmd, SetUniqueIdResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.SET_UNIQUE_ID
             }
 
@@ -215,6 +217,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                         )
                         .build()
                     bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                        ensureActivationTimeNotExceeded()
                 }
                 podStateManager.activationProgress = ActivationProgress.PROGRAMMED_LOW_RESERVOIR_ALERTS
             }
@@ -234,6 +237,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     )
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.REPROGRAMMED_LUMP_OF_COAL_ALERT
             }
 
@@ -253,6 +257,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setO5BolusInfo(mealUnits = 0.0, correctionUnits = 0.0)
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.PRIMING
             }
 
@@ -276,6 +281,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setStatusResponseType(ResponseType.StatusResponseType.DEFAULT_STATUS_RESPONSE)
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 check(podStateManager.podStatus == PodStatus.CLUTCH_DRIVE_ENGAGED) {
                     "Unexpected Pod status: got ${podStateManager.podStatus}, expected CLUTCH_DRIVE_ENGAGED"
                 }
@@ -306,6 +312,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setCurrentTime(Date())
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.PROGRAMMED_BASAL
             }
 
@@ -318,6 +325,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setAlertConfigurations(buildO5ExpirationAlerts(podStateManager, preferences, logger))
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.UPDATED_EXPIRATION_ALERTS
             }
 
@@ -337,6 +345,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setO5BolusInfo(mealUnits = 0.0, correctionUnits = 0.0)
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 podStateManager.activationProgress = ActivationProgress.INSERTING_CANNULA
             }
 
@@ -356,6 +365,7 @@ class O5OmnipodWizardViewModel @Inject constructor(
                     .setStatusResponseType(ResponseType.StatusResponseType.DEFAULT_STATUS_RESPONSE)
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
+                ensureActivationTimeNotExceeded()
                 check(podStateManager.podStatus == PodStatus.RUNNING_ABOVE_MIN_VOLUME) {
                     "Unexpected Pod status: got ${podStateManager.podStatus}, expected RUNNING_ABOVE_MIN_VOLUME"
                 }
@@ -403,9 +413,23 @@ class O5OmnipodWizardViewModel @Inject constructor(
 
     override fun isPodInAlarm(): Boolean = podStateManager.alarmType != null
 
-    override fun isPodActivationTimeExceeded(): Boolean = false // TODO: not yet implemented, same as Dash
+    override fun isPodActivationTimeExceeded(): Boolean = podStateManager.isPodActivationTimeExceeded
 
-    override fun isPodDeactivatable(): Boolean = true // TODO: not yet implemented, same as Dash
+    /** Only offer deactivation once the pod is actually paired - without an LTK and ids there is
+     *  nothing to send a deactivate command to. */
+    override fun isPodDeactivatable(): Boolean =
+        podStateManager.ltk != null && podStateManager.controllerId != null && podStateManager.podId != null
+
+    /**
+     * Stops an activation step from running against a pod that has passed its activation window.
+     * The pod reports this as [app.aaps.pump.omnipod.common.bledriver.pod.definition.PodStatus
+     * .LUMP_OF_COAL]; carrying on would send commands it will never accept.
+     */
+    private fun ensureActivationTimeNotExceeded() {
+        if (podStateManager.isPodActivationTimeExceeded) {
+            throw IllegalStateException(rh.gs(CommonR.string.omnipod_common_error_pod_fault_activation_time_exceeded))
+        }
+    }
 
     // endregion
 

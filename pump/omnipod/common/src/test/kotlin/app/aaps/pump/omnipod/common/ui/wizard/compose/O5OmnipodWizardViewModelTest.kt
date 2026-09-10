@@ -110,11 +110,26 @@ internal class O5OmnipodWizardViewModelTest {
     }
 
     @Test
-    fun podStateQueries_matchDashsUnimplementedDefaults() {
-        // These two are still TODO stubs, same as Dash - no defined timeout/deactivatable
-        // policy exists for either pod type yet.
-        assertThat(sut.isPodActivationTimeExceeded()).isFalse()
+    fun podStateQueries_reflectActivationTimeoutAndPairingState() {
+        whenever(podStateManager.isPodActivationTimeExceeded).thenReturn(true)
+        whenever(podStateManager.ltk).thenReturn(null)
+
+        assertThat(sut.isPodActivationTimeExceeded()).isTrue()
+        // Nothing to deactivate until the pod is actually paired.
+        assertThat(sut.isPodDeactivatable()).isFalse()
+
+        whenever(podStateManager.ltk).thenReturn(ByteArray(16))
+        whenever(podStateManager.controllerId).thenReturn(0x11223340L)
+        whenever(podStateManager.podId).thenReturn(0x11223341L)
+
         assertThat(sut.isPodDeactivatable()).isTrue()
+    }
+
+    @Test
+    fun podStateQueries_doNotReportActivationTimeoutForOtherStates() {
+        whenever(podStateManager.isPodActivationTimeExceeded).thenReturn(false)
+
+        assertThat(sut.isPodActivationTimeExceeded()).isFalse()
     }
 
     @Test

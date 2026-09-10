@@ -49,6 +49,7 @@ import app.aaps.pump.omnipod.common.bledriver.pod.util.P256KeyGenerator
 import app.aaps.pump.omnipod.common.bledriver.pod.util.PodTypeAwarePodScanner
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.core.ObservableEmitter
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -70,6 +71,10 @@ import kotlin.reflect.KClass
  * Also restores previously-imported credentials (via [SecureO5RegistrationStorage]) into
  * [O5RegistrationData]'s in-memory registry on construction - see the `init` block below.
  */
+/** Pause before the single pairing retry, giving the pod time to settle after a
+ *  failed attempt and the BLE link time to drop cleanly. */
+private const val RETRY_DELAY_MS = 3_000L
+
 @Singleton
 class O5BleManagerImpl @Inject constructor(
     private val aapsLogger: AAPSLogger,
@@ -264,67 +269,117 @@ class O5BleManagerImpl @Inject constructor(
             throw BusyException()
         }
         try {
-            if (podState.ltk != null) {
-                emitter.onNext(PodEvent.AlreadyPaired)
-                emitter.onComplete()
-                return@create
+            // One retry. A pairing attempt that fails partway can leave the pod having already
+            // accepted an id, so the second attempt reuses the podId recorded below rather than
+            // starting over - see the id resolution in [pairNewPodAttempt]. Only retry when we
+            // actually have a podId to resume from and the pod is still usable; otherwise a
+            // second attempt just wastes time on a pod that is not going to answer.
+            var lastError: Exception? = null
+            for (attempt in 0..1) {
+                try {
+                    pairNewPodAttempt(emitter)
+                    emitter.onComplete()
+                    return@create
+                } catch (ex: Exception) {
+                    lastError = ex
+                    disconnect(true)
+                    if (attempt == 0 && podState.podId != null && !podState.isPodKaput) {
+                        Thread.sleep(RETRY_DELAY_MS)
+                    } else {
+                        break
+                    }
+                }
             }
-            aapsLogger.info(LTag.PUMPBTCOMM, "Starting new O5 pod activation")
-
-            val controllerId = O5RegistrationData.pickControllerId
-            if (controllerId == 0L) {
-                throw PairingException(
-                    "No O5 registration data available - cannot pair an Omnipod 5 pod without " +
-                        "real Insulet-issued controller credentials (see O5RegistrationData)"
-                )
-            }
-            val certStore = O5CertificateStore(aapsLogger, p256KeyGenerator, controllerId)
-
-            val adapter = bluetoothAdapter ?: throw ConnectException("Bluetooth not available")
-            emitter.onNext(PodEvent.Scanning)
-            val scanner = PodTypeAwarePodScanner(aapsLogger, adapter)
-            val discovered = scanner.scanForPod(PodType.OMNIPOD_5)
-            podState.bluetoothAddress = discovered.address
-
-            emitter.onNext(PodEvent.BluetoothConnecting)
-            // Pass the id we just picked, so the 'hello' handshake announces the same controller
-            // id the pairing messages below use. It is not in podState yet - that only
-            // happens once pairing succeeds.
-            val conn = bleConnectionFactory.createConnection(discovered.address, controllerId)
-            connection = conn
-            conn.connect(ConnectionWaitCondition(timeoutMs = BleConnection.DEFAULT_CONNECT_TIMEOUT_MS))
-            emitter.onNext(PodEvent.BluetoothConnected(discovered.address))
-
-            emitter.onNext(PodEvent.Pairing)
-            val mIO = conn.msgIO ?: throw ConnectException("Connection lost")
-
-            val myId = Id.fromLong(certStore.controllerId)
-            // The pod's real id isn't known before pairing; use the same predicted-id
-            // scheme Dash's own Ids/LTKExchanger use (see Id.increment()'s doc comment),
-            // NOT the "not yet activated" placeholder - that's only the BLE message
-            // *destination* address during pairing (O5LTKExchanger's internal podAddress).
-            val podId = myId.increment()
-
-            val ltkExchanger = O5LTKExchanger(aapsLogger, mIO, certStore, myId, podId)
-            val pairResult = ltkExchanger.o5NegotiateLTK()
-            emitter.onNext(PodEvent.Paired(podId))
-
-            podState.updateFromPairing(certStore.controllerId, podId.toLong(), pairResult)
-            if (config.DEBUG) {
-                aapsLogger.info(LTag.PUMPCOMM, "Got O5 LTK: ${pairResult.ltk.toHex()}")
-            }
-
-            emitter.onNext(PodEvent.EstablishingSession)
-            establishSession(pairResult.msgSeq)
-            podState.successfulConnections++
-            emitter.onNext(PodEvent.Connected)
-            emitter.onComplete()
+            throw requireNotNull(lastError)
         } catch (ex: Exception) {
-            disconnect(false)
+            aapsLogger.error(LTag.PUMPBTCOMM, "O5 pod activation failed", ex)
+            disconnect(true)
             emitter.tryOnError(ex)
         } finally {
             busy.set(false)
         }
+    }
+
+    private fun pairNewPodAttempt(emitter: ObservableEmitter<PodEvent>) {
+        // Already has an LTK: the pod is paired, so reconnect and bring the session up rather
+        // than trying to pair it again.
+        if (podState.ltk != null) {
+            emitter.onNext(PodEvent.AlreadyPaired)
+            val podAddress = podState.bluetoothAddress
+                ?: throw FailedToConnectException("Missing bluetoothAddress, activate the pod first")
+            emitter.onNext(PodEvent.BluetoothConnecting)
+            val conn = bleConnectionFactory.createConnection(podAddress)
+            connection = conn
+            conn.connect(ConnectionWaitCondition(timeoutMs = BleConnection.DEFAULT_CONNECT_TIMEOUT_MS))
+            emitter.onNext(PodEvent.BluetoothConnected(podAddress))
+            establishSession(podState.msgSequenceNumber)
+            emitter.onNext(PodEvent.Connected)
+            return
+        }
+        aapsLogger.info(LTag.PUMPBTCOMM, "Starting new O5 pod activation")
+
+        // Prefer the controller id already in state, so a retry keeps the identity the pod has
+        // seen - but only if the certificate store still holds it.
+        val controllerId = podState.controllerId
+            ?.takeIf(O5RegistrationData::contains)
+            ?: O5RegistrationData.pickControllerId
+        if (controllerId == 0L) {
+            throw PairingException(
+                "No O5 registration data available - cannot pair an Omnipod 5 pod without " +
+                    "real Insulet-issued controller credentials (see O5RegistrationData)"
+            )
+        }
+        val certStore = O5CertificateStore(aapsLogger, p256KeyGenerator, controllerId)
+
+        val podAddress = podState.bluetoothAddress ?: run {
+            val adapter = bluetoothAdapter ?: throw ConnectException("Bluetooth not available")
+            emitter.onNext(PodEvent.Scanning)
+            val scanner = PodTypeAwarePodScanner(aapsLogger, adapter)
+            scanner.scanForPod(PodType.OMNIPOD_5).address.also { podState.bluetoothAddress = it }
+        }
+
+        // The pod's real id is not known before pairing, so it has to be predicted. Resume the
+        // one already in state when it belongs to this controller, else the next id in the
+        // rotation left behind by a previous pod, else the first id for this controller. Getting
+        // this wrong on a retry means addressing a pod that has already moved on.
+        val podIdLong = podState.podId
+            ?.takeIf { podState.controllerId == controllerId }
+            ?: podState.nextPodId
+                ?.takeIf {
+                    O5IdRotation.controllerIdForPodId(it) == O5IdRotation.controllerIdForPodId(controllerId)
+                }
+            ?: O5IdRotation.firstPodId(controllerId)
+        podState.controllerId = controllerId
+        podState.podId = podIdLong
+        podState.nextPodId = null
+
+        emitter.onNext(PodEvent.BluetoothConnecting)
+        // Pass the id we picked, so the 'hello' handshake announces the same controller id the
+        // pairing messages below use.
+        val conn = bleConnectionFactory.createConnection(podAddress, controllerId)
+        connection = conn
+        conn.connect(ConnectionWaitCondition(timeoutMs = BleConnection.DEFAULT_CONNECT_TIMEOUT_MS))
+        emitter.onNext(PodEvent.BluetoothConnected(podAddress))
+
+        emitter.onNext(PodEvent.Pairing)
+        val mIO = conn.msgIO ?: throw ConnectException("Connection lost")
+
+        val myId = Id.fromLong(certStore.controllerId)
+        val podId = Id.fromLong(podIdLong)
+
+        val ltkExchanger = O5LTKExchanger(aapsLogger, mIO, certStore, myId, podId)
+        val pairResult = ltkExchanger.o5NegotiateLTK()
+        emitter.onNext(PodEvent.Paired(podId))
+
+        podState.updateFromPairing(certStore.controllerId, podId.toLong(), pairResult)
+        if (config.DEBUG) {
+            aapsLogger.info(LTag.PUMPCOMM, "Got O5 LTK: ${pairResult.ltk.toHex()}")
+        }
+
+        emitter.onNext(PodEvent.EstablishingSession)
+        establishSession(pairResult.msgSeq)
+        podState.successfulConnections++
+        emitter.onNext(PodEvent.Connected)
     }
 
     override fun sendAidSetupCommands(): Completable = Completable.fromAction {
