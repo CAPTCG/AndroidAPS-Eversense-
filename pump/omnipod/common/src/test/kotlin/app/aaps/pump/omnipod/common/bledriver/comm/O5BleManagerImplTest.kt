@@ -5,11 +5,17 @@ import app.aaps.core.interfaces.configuration.Config
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.FailedToConnectException
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.PairingException
 import app.aaps.pump.omnipod.common.bledriver.comm.interfaces.device.BleDeviceManager
+import app.aaps.pump.omnipod.common.bledriver.comm.interfaces.session.BleConnection
 import app.aaps.pump.omnipod.common.bledriver.comm.legacy.O5BleConnectionFactory
 import app.aaps.pump.omnipod.common.bledriver.comm.pair.O5RegistrationData
+import app.aaps.pump.omnipod.common.bledriver.comm.session.CommandReceiveSuccess
+import app.aaps.pump.omnipod.common.bledriver.comm.session.CommandSendSuccess
+import app.aaps.pump.omnipod.common.bledriver.comm.session.Connected
 import app.aaps.pump.omnipod.common.bledriver.comm.session.NotConnected
+import app.aaps.pump.omnipod.common.bledriver.comm.session.Session
 import app.aaps.pump.omnipod.common.bledriver.pod.command.base.Command
 import app.aaps.pump.omnipod.common.bledriver.pod.response.DefaultStatusResponse
+import app.aaps.pump.omnipod.common.bledriver.pod.response.Response
 import app.aaps.pump.omnipod.common.bledriver.pod.security.SecureO5RegistrationStorage
 import app.aaps.pump.omnipod.common.bledriver.pod.state.O5PodStateManager
 import app.aaps.pump.omnipod.common.bledriver.pod.util.P256KeyGenerator
@@ -20,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -46,6 +53,58 @@ class O5BleManagerImplTest {
         aapsLogger, podState, config, context, bleConnectionFactory,
         bleDeviceManager, secureO5RegistrationStorage, p256KeyGenerator
     )
+
+    private val podAddress = "AA:BB:CC:DD:EE:FF"
+
+    /** A paired pod whose BLE link and session are already up, so connect() takes its
+     *  already-connected path. Returns the session so a test can stub command traffic. */
+    private fun alreadyConnectedPod(): Session {
+        val session = mock<Session>()
+        val conn = mock<BleConnection>()
+        whenever(podState.bluetoothAddress).thenReturn(podAddress)
+        whenever(bleDeviceManager.isBluetoothAvailable()).thenReturn(true)
+        whenever(bleDeviceManager.ensureBondedIfRequired(podAddress)).thenReturn(true)
+        whenever(conn.connectionState()).thenReturn(Connected)
+        whenever(conn.session).thenReturn(session)
+        whenever(bleConnectionFactory.createConnection(podAddress)).thenReturn(conn)
+        return session
+    }
+
+    @Test
+    fun `connect chained with andThen into another call does not trip over its own busy flag`() {
+        // andThen subscribes the next source synchronously inside onComplete. If connect()
+        // released busy only in finally, the second call would see busy=true and fail.
+        alreadyConnectedPod()
+        val manager = newManager()
+
+        val observer = manager.connect(timeoutMs = 1000).ignoreElements()
+            .andThen(manager.connect(timeoutMs = 1000).ignoreElements())
+            .test()
+
+        observer.assertNoErrors()
+        observer.assertComplete()
+    }
+
+    @Test
+    fun `connect then two commands chained with andThen all run, as fetchStatus does`() {
+        // Same shape as O5PumpPlugin.fetchStatus(): ensureConnected().andThen(status read)
+        // .andThen(follow-up read). On the first paired pod (2026-09-10) every such chain
+        // failed with BusyException, so status reads and bolus cancel never reached the pod.
+        val session = alreadyConnectedPod()
+        val cmd = mock<Command>()
+        whenever(session.sendCommand(cmd)).thenReturn(CommandSendSuccess)
+        whenever(session.readAndAckResponse()).thenReturn(CommandReceiveSuccess(mock<Response>()))
+        val manager = newManager()
+
+        val observer = manager.connect(timeoutMs = 1000).ignoreElements()
+            .andThen(manager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements())
+            .andThen(manager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements())
+            .test()
+
+        observer.assertNoErrors()
+        observer.assertComplete()
+        verify(session, times(2)).sendCommand(cmd)
+    }
 
     @BeforeEach
     fun clearRegistrationData() {

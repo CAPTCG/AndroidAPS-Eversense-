@@ -150,6 +150,12 @@ class O5BleManagerImpl @Inject constructor(
                         return@create
                     }
                 }
+                // Release the busy flag BEFORE onComplete, not only in finally. An `andThen`
+                // downstream subscribes the next source synchronously inside onComplete, so a
+                // chained sendCommand would still see busy=true and throw BusyException. That is
+                // exactly what broke fetchStatus() and cancelBolus() - ensureConnected().andThen(...)
+                // - on the first paired pod (2026-09-10). The finally below stays as a safety net.
+                busy.set(false)
                 emitter.onComplete()
             } catch (ex: Exception) {
                 disconnect(false)
@@ -210,6 +216,8 @@ class O5BleManagerImpl @Inject constructor(
                 connection = conn
                 if (conn.connectionState() is Connected && conn.session != null) {
                     emitter.onNext(PodEvent.AlreadyConnected(podAddress))
+                    // See sendCommand(): release before onComplete so a chained call can run.
+                    busy.set(false)
                     emitter.onComplete()
                     return@create
                 }
@@ -221,6 +229,8 @@ class O5BleManagerImpl @Inject constructor(
                 establishSession(1.toByte())
                 emitter.onNext(PodEvent.Connected)
 
+                // See sendCommand(): release before onComplete so a chained call can run.
+                busy.set(false)
                 emitter.onComplete()
             } catch (ex: Exception) {
                 disconnect(false)
