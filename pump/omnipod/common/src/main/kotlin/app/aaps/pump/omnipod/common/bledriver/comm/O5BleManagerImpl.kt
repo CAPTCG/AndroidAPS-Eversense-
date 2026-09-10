@@ -269,6 +269,17 @@ class O5BleManagerImpl @Inject constructor(
             throw BusyException()
         }
         try {
+            // A new activation must look for the pod that is actually here. A saved address is
+            // only kept once the pod is paired (it has an LTK) - before that it can belong to an
+            // earlier pod that failed to pair and was never discarded. pairNewPodAttempt() only
+            // scans when no address is saved, so without this it would keep trying to reach a
+            // pod that no longer exists: on 2026-09-10 every attempt went to the pod from the
+            // 10 August failure and timed out with GATT status 147. The retry below still
+            // reuses the address that this activation's own scan finds.
+            if (podState.ltk == null && podState.bluetoothAddress != null) {
+                aapsLogger.info(LTag.PUMPBTCOMM, "Forgetting saved O5 address ${podState.bluetoothAddress} of an unpaired pod - scanning instead")
+                podState.bluetoothAddress = null
+            }
             // One retry. A pairing attempt that fails partway can leave the pod having already
             // accepted an id, so the second attempt reuses the podId recorded below rather than
             // starting over - see the id resolution in [pairNewPodAttempt]. Only retry when we

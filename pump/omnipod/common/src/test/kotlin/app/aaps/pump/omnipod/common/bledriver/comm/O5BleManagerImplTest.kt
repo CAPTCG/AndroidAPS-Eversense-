@@ -112,6 +112,36 @@ class O5BleManagerImplTest {
     }
 
     @Test
+    fun `pairNewPod forgets a saved address from an earlier unpaired pod before a new activation`() {
+        // The address of a pod that failed to pair stays in state until the pod is discarded.
+        // A new activation must scan for the pod that is actually here, not dial the old one -
+        // that is how a real attempt on 2026-09-10 timed out against a pod from August.
+        whenever(podState.ltk).thenReturn(null)
+        whenever(podState.bluetoothAddress).thenReturn("44:D4:65:62:73:54")
+        val manager = newManager()
+
+        val observer = manager.pairNewPod().test()
+
+        observer.assertError(PairingException::class.java)
+        verify(podState).bluetoothAddress = null
+    }
+
+    @Test
+    fun `pairNewPod keeps the saved address of a pod that is already paired`() {
+        // A paired pod (it has an LTK) is reconnected by its saved address - that address is
+        // the only way to reach it, so it must not be forgotten.
+        whenever(podState.ltk).thenReturn(byteArrayOf(1, 2, 3))
+        whenever(podState.bluetoothAddress).thenReturn("AA:BB:CC:DD:EE:FF")
+        whenever(bleConnectionFactory.createConnection("AA:BB:CC:DD:EE:FF")).thenThrow(IllegalStateException("no pod in test"))
+        val manager = newManager()
+
+        val observer = manager.pairNewPod().test()
+
+        observer.assertError(IllegalStateException::class.java)
+        verify(podState, never()).bluetoothAddress = null
+    }
+
+    @Test
     fun `removeBond does nothing and does not call the device manager when bluetoothAddress is unknown`() {
         whenever(podState.bluetoothAddress).thenReturn(null)
         val manager = newManager()
