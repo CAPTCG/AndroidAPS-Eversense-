@@ -1028,11 +1028,18 @@ class O5PumpPlugin @Inject constructor(
             sequenceNumber = podStateManager.msgSequenceNumber.toShort()
         )
         armStatusChecker()
+        // StopDeliveryCommand defaults its beep to LONG_SINGLE_BEEP, and the loop stops the temp
+        // basal before setting a new one on most cycles - so the pod beeped once every cycle,
+        // regardless of the confirmation-beep settings (those gate the ProgramReminder on the new
+        // delivery, not the beep on this stop). Honour the TBR-beep preference here, the way Dash
+        // gates its own stop/suspend beep: silent unless the user asked for a beep.
+        val tbrBeep = if (preferences.get(OmnipodBooleanPreferenceKey.TbrBeepsEnabled)) BeepType.LONG_SINGLE_BEEP else BeepType.SILENT
         val cmd = StopDeliveryCommand.Builder()
             .setUniqueId(requirePodId())
             .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
             .setNonce(FIXED_NONCE)
             .setDeliveryType(StopDeliveryCommand.DeliveryType.TEMP_BASAL)
+            .setBeepType(tbrBeep)
             .build()
         bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
         podStateManager.activeTempBasalStartTime = null
