@@ -1,5 +1,18 @@
 # Eversense E3/365 CGM Plugin for AndroidAPS
 
+> **⚠️ Warning: base AndroidAPS commit**
+> This Eversense code was written and tested against AndroidAPS `dev` commit
+> [`283a184f60e`](https://github.com/nightscout/AndroidAPS/commit/283a184f60eb8b18dac42e228faebbe260c3aa22)
+> (2026-08-25). Newer changes on AndroidAPS `dev` after that commit have **not**
+> been tested with this Eversense code. If you merge this into a more recent
+> AndroidAPS checkout, expect possible conflicts or broken behavior, and test
+> carefully before relying on it.
+>
+> A build of this whole project, with all Eversense-tested code from this
+> branch, is set to **never expire**. AndroidAPS's normal build-expiration
+> check is turned off here, so the app will not stop working or lock the
+> loop after some months, the way a normal AndroidAPS build does.
+
 Adds native Eversense E3 and E365 CGM support to AndroidAPS as a direct BLE-connected BG source — no patches to apply. Clone this repo/branch and build it directly.
 
 Developed by [n0rb33r7](https://github.com/n0rb33r7), [bastiaanv](https://github.com/bastiaanv), and [CAPTCG](https://github.com/CAPTCG).
@@ -16,15 +29,32 @@ This is an experimental, community-developed modification. It is not approved by
 4. Build → Generate Signed Bundle/APK → APK → full → release.
 5. Install the APK on your phone.
 
-If you'd rather merge this Eversense support into your own existing AndroidAPS checkout instead of building from this repo directly, add this repo as a git remote and merge the branch in:
+If you'd rather bring this Eversense support into your own existing AndroidAPS checkout instead of building from this repo directly, you can fetch this branch and merge it in, but it will **not** be a clean three-way merge:
 
     git remote add eversense https://github.com/CAPTCG/AndroidAPS-Eversense-.git
     git fetch eversense
-    git merge eversense/european-region-support
+    git merge --allow-unrelated-histories eversense/european-region-support
 
-This is a real three-way git merge, not a patch application — it will correctly integrate with whatever state your own checkout is in, including any future upstream AndroidAPS changes, as long as you keep this repo's branch itself periodically updated against upstream `dev`.
+**Note:** this repository's branch does not share commit history with your own AndroidAPS checkout — its history was flattened to a single commit before it was published here. Without shared history, git cannot tell which side changed a file, so every file that differs between your checkout and this branch shows up as a conflict you must resolve by hand, even files that only one side actually touched. Cloning or fetching this branch is still a large download (around 400 MB), since it carries a full snapshot of the AndroidAPS codebase, not a small patch. For most people, cloning and building this repo directly (above) is the simpler, supported path.
 
-**Note:** this repository's branch shares full commit history with upstream AndroidAPS, so cloning or fetching it is a full-size operation (hundreds of MB), not a lightweight patch download.
+### Resolving the merge conflicts
+
+This was tested and confirmed working on a plain AndroidAPS `dev` checkout at commit `283a184f60e` (see the warning at the top of this file). The merge above stops with about 30 "add/add" conflicts — one for every file this branch touches, since git has no shared history to compare against.
+
+If your checkout is at, or close to, commit `283a184f60e`, every one of these conflicts can be resolved the same way: keep this branch's side of the file. This branch's version already contains the base AndroidAPS file plus the Eversense addition, and your side has nothing extra worth keeping in these specific files.
+
+    git status --short | grep "^AA" | awk '{print $2}' > conflicted_files.txt
+    while IFS= read -r f; do
+        git checkout --theirs -- "$f"
+        git add -- "$f"
+    done < conflicted_files.txt
+    git commit
+
+**Important:** this shortcut is only safe when your checkout is at, or close to, commit `283a184f60e`. If your checkout is much newer, some of these same files may carry your own newer AndroidAPS changes, and `git checkout --theirs` would throw those away without telling you. In that case, open each conflicted file and combine both sides by hand instead of picking one side blindly.
+
+After resolving, do a full build to make sure nothing broke:
+
+    ./gradlew assembleFullDebug
 
 ---
 
