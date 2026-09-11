@@ -645,6 +645,11 @@ class O5PumpPlugin @Inject constructor(
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
                 podStateManager.deliverySuspended = true
+                // This suspend arms the pod's SUSPEND_ENDED alert (see SuspendDeliveryCommand),
+                // so record it - disableSuspendAlerts() below relies on this to silence it again,
+                // the same way the manual suspendDelivery() path does. Without this the pod keeps
+                // beeping "insulin delivery is suspended" after every profile change.
+                podStateManager.suspendAlertsEnabled = true
             }
 
             podStateManager.pendingDoseCommand = O5PodStateManager.PendingDoseCommand(
@@ -1240,11 +1245,13 @@ class O5PumpPlugin @Inject constructor(
     }
 
     /** Silences the pod's SUSPEND_ENDED alert once delivery has resumed - see
-     *  [podStateManager]'s suspendAlertsEnabled doc comment. */
+     *  [podStateManager]'s suspendAlertsEnabled doc comment.
+     *
+     *  Always sends the disable command (no early return on the tracking flag), the same
+     *  as Dash's disableSuspendAlerts(). The flag is only used to decide whether to clear
+     *  it afterwards. Gating the send on the flag left the SUSPEND_ENDED alert armed after
+     *  a basal profile change, so the pod kept beeping "insulin delivery is suspended". */
     private fun disableSuspendAlerts(): PumpEnactResult {
-        if (!podStateManager.suspendAlertsEnabled) {
-            return pumpEnactResultProvider.get().success(true).enacted(false)
-        }
         return try {
             val cmd = ProgramAlertsCommand.Builder()
                 .setUniqueId(requirePodId())
