@@ -636,12 +636,17 @@ class O5PumpPlugin @Inject constructor(
         }
         if (!pendingDoseResolved()) return unresolvedDoseResult()
         val basalProgram = mapProfileToBasalProgram(profile, PumpType.OMNIPOD_5)
+        val basalBeeps = preferences.get(OmnipodBooleanPreferenceKey.BasalBeepsEnabled)
         return try {
             if (podStateManager.deliveryStatus?.suspended() != true) {
+                // Suspending to write the new basal makes the pod beep at once unless we silence
+                // it. Gate that beep on the basal-beep setting, the same way Dash does -
+                // otherwise every profile change beeps even with beeps turned off.
                 val cmd = SuspendDeliveryCommand.Builder()
                     .setUniqueId(requirePodId())
                     .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
                     .setNonce(FIXED_NONCE)
+                    .setBeepType(if (basalBeeps) BeepType.LONG_SINGLE_BEEP else BeepType.SILENT)
                     .build()
                 bleManager.sendCommand(cmd, DefaultStatusResponse::class).ignoreElements().blockingAwait()
                 podStateManager.deliverySuspended = true
@@ -658,7 +663,6 @@ class O5PumpPlugin @Inject constructor(
                 sequenceNumber = podStateManager.msgSequenceNumber.toShort()
             )
             armStatusChecker()
-            val basalBeeps = preferences.get(OmnipodBooleanPreferenceKey.BasalBeepsEnabled)
             val cmd = ProgramBasalCommand.Builder()
                 .setUniqueId(requirePodId())
                 .setSequenceNumber(podStateManager.msgSequenceNumber.toShort())
