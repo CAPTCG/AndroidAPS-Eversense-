@@ -86,13 +86,15 @@ class SecureO5RegistrationStorage @Inject constructor(
     /**
      * On a fresh install, install the build-time embedded credential (if this build has one)
      * so the app is usable without pasting a credential first. [embeddedBase64] is the
-     * base64-encoded credential text baked into the build (empty when the build has none).
+     * base64-encoded credential text baked into the build (empty when the build has none). The
+     * text may hold several credentials separated by a blank line, in which case a random one
+     * is picked (see [O5RegistrationData.installOneFromPool]).
      *
      * Runs at most once per install: it records a seeded marker, so a later Remove sticks and
      * the credential is not re-added on the next restart; a genuine reinstall clears the marker
-     * and re-seeds. No-ops when the build has no embedded credential, when a credential is
-     * already present (e.g. one the user pasted), or once already seeded. Call after
-     * [loadAndInstallAll] at startup.
+     * and re-seeds (picking again from the pool). No-ops when the build has no embedded
+     * credential, when a credential is already present (e.g. one the user pasted), or once
+     * already seeded. Call after [loadAndInstallAll] at startup.
      */
     fun seedEmbeddedCredentialIfNeeded(embeddedBase64: String) {
         if (embeddedBase64.isEmpty()) return
@@ -105,9 +107,9 @@ class SecureO5RegistrationStorage @Inject constructor(
         }
         try {
             val text = String(Base64.getDecoder().decode(embeddedBase64), Charsets.UTF_8)
-            val controllerId = O5RegistrationData.installFromText(text, O5RegistrationData.O5RegistrationSource.BUILT_IN)
+            val controllerId = O5RegistrationData.installOneFromPool(text, O5RegistrationData.O5RegistrationSource.BUILT_IN)
             if (controllerId == null) {
-                logger.error(LTag.PUMPCOMM, "Embedded O5 credential could not be parsed; not seeding")
+                logger.error(LTag.PUMPCOMM, "No embedded O5 credential could be parsed; not seeding")
                 return
             }
             O5RegistrationData.get(controllerId)?.let { persistEntry(it, O5RegistrationData.O5RegistrationSource.BUILT_IN) }

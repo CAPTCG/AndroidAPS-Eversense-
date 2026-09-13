@@ -211,6 +211,40 @@ data class O5RegistrationData(
         }
 
         /**
+         * Installs ONE credential chosen at random from [text], which may hold several
+         * credentials separated by a blank line (each a packed string or an o5keypair JSON
+         * object). Tries the candidates in random order and installs the first that parses, so
+         * a single malformed entry does not block the rest. Returns the installed controllerId,
+         * or null if [text] held no parseable credential.
+         *
+         * Used for the build-time credential pool (see the seeding code): with several
+         * credentials baked in, each fresh install picks a random one, which gives a simple
+         * fallback if one credential is ever revoked.
+         */
+        fun installOneFromPool(text: String, source: O5RegistrationSource): Long? {
+            val blocks = mutableListOf<String>()
+            val current = StringBuilder()
+            for (line in text.lines()) {
+                if (line.isBlank()) {
+                    if (current.isNotBlank()) {
+                        blocks.add(current.toString().trim())
+                        current.setLength(0)
+                    }
+                } else {
+                    if (current.isNotEmpty()) current.append('\n')
+                    current.append(line)
+                }
+            }
+            if (current.isNotBlank()) blocks.add(current.toString().trim())
+
+            for (block in blocks.shuffled()) {
+                val controllerId = installFromText(block, source)
+                if (controllerId != null) return controllerId
+            }
+            return null
+        }
+
+        /**
          * Builds the packed string form of [data], the inverse of [installPacked] - useful
          * for exporting/backing up an installed credential.
          */

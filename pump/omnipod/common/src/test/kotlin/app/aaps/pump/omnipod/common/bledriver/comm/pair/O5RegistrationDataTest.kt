@@ -70,4 +70,42 @@ class O5RegistrationDataTest {
         assertThat(O5RegistrationData.installFromText(incomplete, O5RegistrationData.O5RegistrationSource.BUILT_IN)).isNull()
         assertThat(O5RegistrationData.allValues).isEmpty()
     }
+
+    @Test
+    fun `installOneFromPool installs exactly one of several blank-line-separated credentials`() {
+        val ids = listOf(111L, 222L, 333L)
+        val pool = ids.joinToString("\n\n") { packed(it) }
+
+        val result = O5RegistrationData.installOneFromPool(pool, O5RegistrationData.O5RegistrationSource.BUILT_IN)
+
+        assertThat(result).isIn(ids)
+        // Exactly one credential is installed, not the whole pool.
+        assertThat(O5RegistrationData.allValues).hasSize(1)
+        assertThat(O5RegistrationData.contains(result!!)).isTrue()
+    }
+
+    @Test
+    fun `installOneFromPool skips a malformed entry and installs a valid one`() {
+        val pool = "this is not a credential\n\n${packed(4242L)}"
+
+        val result = O5RegistrationData.installOneFromPool(pool, O5RegistrationData.O5RegistrationSource.BUILT_IN)
+
+        assertThat(result).isEqualTo(4242L)
+        assertThat(O5RegistrationData.allValues).hasSize(1)
+    }
+
+    @Test
+    fun `installOneFromPool with a single credential installs that one`() {
+        val result = O5RegistrationData.installOneFromPool(packed(9090L), O5RegistrationData.O5RegistrationSource.BUILT_IN)
+
+        assertThat(result).isEqualTo(9090L)
+    }
+
+    @Test
+    fun `installOneFromPool returns null and installs nothing when no entry parses`() {
+        val pool = "garbage\n\nmore garbage\n\n"
+
+        assertThat(O5RegistrationData.installOneFromPool(pool, O5RegistrationData.O5RegistrationSource.BUILT_IN)).isNull()
+        assertThat(O5RegistrationData.allValues).isEmpty()
+    }
 }

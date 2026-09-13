@@ -20,9 +20,11 @@ android {
         // Optional build-time Omnipod 5 credential. Drop a credential string (packed or the
         // o5keypair JSON) into pump/omnipod/common/o5credential.txt and it is base64-encoded
         // into BuildConfig.O5_EMBEDDED_CREDENTIAL, which the app seeds on a fresh install (see
-        // SecureO5RegistrationStorage.seedEmbeddedCredentialIfNeeded). The file holds a PRIVATE
-        // KEY - keep it out of any public branch/PR. When it is absent the field is empty and
-        // nothing is embedded, so builds that don't have the file behave exactly as before.
+        // SecureO5RegistrationStorage.seedEmbeddedCredentialIfNeeded). To bake in several and
+        // have each fresh install pick a random one, put multiple credentials in the file
+        // separated by a blank line. The file holds a PRIVATE KEY - keep it out of any public
+        // branch/PR. When it is absent the field is empty and nothing is embedded, so builds
+        // that don't have the file behave exactly as before.
         val credentialFile = project.file("o5credential.txt")
         val embeddedCredential = if (credentialFile.exists())
             Base64.getEncoder().encodeToString(credentialFile.readText().trim().toByteArray(Charsets.UTF_8))
