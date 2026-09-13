@@ -7,6 +7,7 @@ import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.utils.toHex
+import app.aaps.pump.omnipod.common.BuildConfig
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.BusyException
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.ConnectException
 import app.aaps.pump.omnipod.common.bledriver.comm.exceptions.CouldNotSendCommandException
@@ -94,6 +95,10 @@ class O5BleManagerImpl @Inject constructor(
         // registration data is available by the time it's actually needed, without requiring
         // a separate app-startup hook.
         secureO5RegistrationStorage.loadAndInstallAll()
+        // On a fresh install, seed the build-time embedded credential (if this build has one)
+        // so the app is usable without pasting first. No-op when the build has none, when a
+        // credential is already present, or once already seeded (a later Remove then sticks).
+        secureO5RegistrationStorage.seedEmbeddedCredentialIfNeeded(BuildConfig.O5_EMBEDDED_CREDENTIAL)
     }
 
     private val busy = AtomicBoolean(false)

@@ -7,8 +7,6 @@ import app.aaps.pump.omnipod.common.bledriver.pod.security.SecureO5RegistrationS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.json.JSONException
-import org.json.JSONObject
 import javax.inject.Inject
 
 /** One row of the "currently installed credentials" list shown in the import screen. */
@@ -77,7 +75,7 @@ class O5CredentialImportViewModel @Inject constructor(
             return
         }
 
-        val controllerId = if (text.startsWith("{")) importJsonCredential(text) else importPackedCredential(text)
+        val controllerId = O5RegistrationData.installFromText(text, O5RegistrationData.O5RegistrationSource.IMPORTED)
         if (controllerId == null) {
             _importResult.value = ImportResult.Failure(
                 "Could not parse that credential - check it was copied completely"
@@ -99,34 +97,6 @@ class O5CredentialImportViewModel @Inject constructor(
         refreshInstalledCredentials()
     }
 
-    /**
-     * Parses [text] as the `.o5keypair`-shaped JSON object OmnipodKit's own `toJSON()`
-     * produces on iOS and installs it if valid. Returns the resulting controllerId, or
-     * null if the text wasn't valid JSON or was missing a required field.
-     */
-    private fun importJsonCredential(text: String): Long? {
-        val json = try {
-            JSONObject(text)
-        } catch (e: JSONException) {
-            return null
-        }
-        val map = REQUIRED_JSON_KEYS.associateWith { key -> json.optString(key, null) }
-        val data = O5RegistrationData.fromJsonMap(map) ?: return null
-        O5RegistrationData.install(data, O5RegistrationData.O5RegistrationSource.IMPORTED)
-        return data.controllerId
-    }
-
-    /**
-     * Parses [text] as a packed `"controllerId|priv|pub|ica|tls"` string and installs it
-     * if valid (see [O5RegistrationData.installPacked]). Returns the resulting
-     * controllerId, or null if parsing/installation failed.
-     */
-    private fun importPackedCredential(text: String): Long? {
-        val controllerId = parseControllerIdFromPacked(text)
-        val ok = O5RegistrationData.installPacked(text)
-        return controllerId.takeIf { ok }
-    }
-
     /** Removes a credential from both the in-memory registry and persisted storage. */
     fun removeCredential(controllerId: Long) {
         O5RegistrationData.remove(controllerId)
@@ -140,19 +110,5 @@ class O5CredentialImportViewModel @Inject constructor(
                 InstalledCredentialRow(data.controllerId, source)
             }
         }
-    }
-
-    /**
-     * Pulls just the controllerId out of a packed string, without fully parsing/validating
-     * it - used so a failed [O5RegistrationData.installPacked] call can still be attributed
-     * to a specific controllerId if the string was at least well-formed enough to read one.
-     * Returns null for anything that doesn't even have a parseable leading controllerId field.
-     */
-    private fun parseControllerIdFromPacked(packed: String): Long? =
-        packed.substringBefore("|").toLongOrNull()
-
-    private companion object {
-        /** Matches the keys OmnipodKit's `O5RegistrationData.toJSON()` produces on iOS. */
-        val REQUIRED_JSON_KEYS = listOf("controllerId", "privateKey", "publicKey", "intermediateCA", "tlsCertificate")
     }
 }

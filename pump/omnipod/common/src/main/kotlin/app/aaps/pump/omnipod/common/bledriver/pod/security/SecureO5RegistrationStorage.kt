@@ -7,6 +7,7 @@ import app.aaps.pump.omnipod.common.bledriver.comm.pair.O5RegistrationData
 import app.aaps.pump.omnipod.common.keys.O5StringNonPreferenceKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,6 +84,41 @@ class SecureO5RegistrationStorage @Inject constructor(
     }
 
     /**
+     * On a fresh install, install the build-time embedded credential (if this build has one)
+     * so the app is usable without pasting a credential first. [embeddedBase64] is the
+     * base64-encoded credential text baked into the build (empty when the build has none).
+     *
+     * Runs at most once per install: it records a seeded marker, so a later Remove sticks and
+     * the credential is not re-added on the next restart; a genuine reinstall clears the marker
+     * and re-seeds. No-ops when the build has no embedded credential, when a credential is
+     * already present (e.g. one the user pasted), or once already seeded. Call after
+     * [loadAndInstallAll] at startup.
+     */
+    fun seedEmbeddedCredentialIfNeeded(embeddedBase64: String) {
+        if (embeddedBase64.isEmpty()) return
+        if (!preferences.getIfExists(O5StringNonPreferenceKey.EmbeddedCredentialSeeded).isNullOrEmpty()) return
+        if (O5RegistrationData.allValues.isNotEmpty()) {
+            // A credential is already present - don't override the user's choice, just mark
+            // seeded so we never fight it later.
+            preferences.put(O5StringNonPreferenceKey.EmbeddedCredentialSeeded, SEEDED_MARKER)
+            return
+        }
+        try {
+            val text = String(Base64.getDecoder().decode(embeddedBase64), Charsets.UTF_8)
+            val controllerId = O5RegistrationData.installFromText(text, O5RegistrationData.O5RegistrationSource.BUILT_IN)
+            if (controllerId == null) {
+                logger.error(LTag.PUMPCOMM, "Embedded O5 credential could not be parsed; not seeding")
+                return
+            }
+            O5RegistrationData.get(controllerId)?.let { persistEntry(it, O5RegistrationData.O5RegistrationSource.BUILT_IN) }
+            preferences.put(O5StringNonPreferenceKey.EmbeddedCredentialSeeded, SEEDED_MARKER)
+            logger.debug(LTag.PUMPCOMM, "Seeded built-in O5 credential for controller 0x%08X".format(controllerId))
+        } catch (ex: Exception) {
+            logger.error(LTag.PUMPCOMM, "Failed to seed embedded O5 credential", ex)
+        }
+    }
+
+    /**
      * Persists [data] (with the given [source]) so it survives app restarts, alongside any
      * other already-persisted entries. Re-encrypts and re-saves the entire entry set - simple
      * and safe for the very small number of entries (realistically 1) this ever holds.
@@ -137,5 +173,11 @@ class SecureO5RegistrationStorage @Inject constructor(
     private fun parseEntries(json: String): List<PersistedEntry> {
         val type = object : TypeToken<List<PersistedEntry>>() {}.type
         return gson.fromJson(json, type) ?: emptyList()
+    }
+
+    private companion object {
+
+        /** Any non-empty value marks the embedded credential as already seeded for this install. */
+        const val SEEDED_MARKER = "1"
     }
 }

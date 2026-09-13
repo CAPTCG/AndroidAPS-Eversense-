@@ -16,4 +16,8 @@ enum class O5StringNonPreferenceKey(
     /** Holds Keystore-encrypted O5 registration (credential) data - never exported, since
      *  unlike pod connection state, this contains actual key material. */
     RegistrationData("AAPS.Omnipod5.registration_data_encrypted", "", exportable = false),
+
+    /** Non-empty once the build-time embedded credential has been seeded on this install, so
+     *  it is seeded at most once and a later Remove sticks. Cleared only by a fresh install. */
+    EmbeddedCredentialSeeded("AAPS.Omnipod5.embedded_credential_seeded", "", exportable = false),
 }

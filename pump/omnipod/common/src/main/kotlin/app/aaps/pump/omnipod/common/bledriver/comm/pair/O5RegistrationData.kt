@@ -1,5 +1,7 @@
 package app.aaps.pump.omnipod.common.bledriver.comm.pair
 
+import org.json.JSONException
+import org.json.JSONObject
 import java.util.Base64
 import java.util.Random
 import java.util.ServiceLoader
@@ -162,6 +164,50 @@ data class O5RegistrationData(
                 source = O5RegistrationSource.IMPORTED
             )
             return true
+        }
+
+        /** Field names in an "o5keypair" JSON object, matching OmnipodKit's `toJSON()`. */
+        private val REQUIRED_JSON_KEYS = listOf("controllerId", "privateKey", "publicKey", "intermediateCA", "tlsCertificate")
+
+        /**
+         * Installs a credential from raw [text] in either supported format - the packed
+         * `"controllerId|privB64|pubB64|icaB64|tlsB64"` string, or an "o5keypair" JSON object -
+         * auto-detected from the text. Installs it with [source] and returns the controllerId,
+         * or null if the text was blank or could not be parsed. Never throws. Used both by the
+         * paste-import screen and by the build-time seeding of a [O5RegistrationSource.BUILT_IN]
+         * credential.
+         */
+        fun installFromText(text: String, source: O5RegistrationSource): Long? {
+            val trimmed = text.trim()
+            if (trimmed.isEmpty()) return null
+            return if (trimmed.startsWith("{")) {
+                val json = try {
+                    JSONObject(trimmed)
+                } catch (e: JSONException) {
+                    return null
+                }
+                val map = REQUIRED_JSON_KEYS.associateWith { key -> json.optString(key, null) }
+                val data = fromJsonMap(map) ?: return null
+                install(data, source)
+                data.controllerId
+            } else {
+                val parts = trimmed.split("|")
+                if (parts.size != 5) return null
+                val controllerId = parts[0].toLongOrNull() ?: return null
+                val privateKeyHex = base64ToHexOrNull(parts[1]) ?: return null
+                val publicKeyHex = base64ToHexOrNull(parts[2]) ?: return null
+                install(
+                    O5RegistrationData(
+                        controllerId = controllerId,
+                        privateKeyHex = privateKeyHex,
+                        publicKeyHex = publicKeyHex,
+                        intermediateCABase64 = parts[3],
+                        tlsCertificateBase64 = parts[4]
+                    ),
+                    source
+                )
+                controllerId
+            }
         }
 
         /**
