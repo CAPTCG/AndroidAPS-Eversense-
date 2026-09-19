@@ -3,10 +3,13 @@
 Personal reference for getting an Omnipod 5 credential into this build without pasting it by
 hand every time. Written so future-me can follow the steps cold.
 
-> **This file's sibling `o5credential.txt` holds a PRIVATE KEY.** Keep it in this private repo
-> only. Never let it ride into a public branch or the PR to premnirmal. (The public PR is the
-> `omnipod5` module on the other fork, so a file here in `common` will not follow it - but do
-> not add it there by hand.)
+> **`o5credential.txt` holds PRIVATE KEYS and is git-ignored - it is never tracked or committed.**
+> Create it locally from `o5credential.txt.example` (see the steps below); the build reads it, but
+> git will not pick it up. This branch (`July26OmnipodKtClean`) also has the previously-committed
+> `o5credential.txt` scrubbed from its **entire history**, so no keys live anywhere in the repo.
+> Never re-add it to a tracked path, and never let it ride into a public branch or the PR to
+> premnirmal. Do not merge the old `July26OmnipodKt` / `-v2` line into this branch - they still
+> carry the file in history and a merge would re-introduce it.
 
 ---
 
@@ -38,9 +41,9 @@ hand every time. Written so future-me can follow the steps cold.
 Example (three, blank-line separated):
 
 ```
-2761936|<privB64>|<pubB64>|<icaB64>|<tlsB64>
+<controllerId>|<privB64>|<pubB64>|<icaB64>|<tlsB64>
 
-{"controllerId":"2733996","privateKey":"...","publicKey":"...","intermediateCA":"...","tlsCertificate":"..."}
+{"controllerId":"<controllerId>","privateKey":"...","publicKey":"...","intermediateCA":"...","tlsCertificate":"..."}
 
 <third credential>
 ```
@@ -64,8 +67,9 @@ survives updates and clears only on a fresh install):
 
 ## Steps: put a credential (or a pool) into a build
 
-1. In Android Studio, Project view -> `pump` -> `omnipod` -> `common`. Create/open
-   `o5credential.txt` right in the `common` folder. Confirm the path is exactly
+1. In Android Studio, Project view -> `pump` -> `omnipod` -> `common`. Copy the committed
+   `o5credential.txt.example` to `o5credential.txt` in the same `common` folder (the real file is
+   git-ignored, so it stays local and is never committed). Confirm the path is exactly
    `...\pump\omnipod\common\o5credential.txt` (Copy Path/Reference -> Absolute Path). A Scratch
    file or any other folder will NOT be read by the build.
 2. Paste the credential string(s). Several? Separate each with a blank line.
