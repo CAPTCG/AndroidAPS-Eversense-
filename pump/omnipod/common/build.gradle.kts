@@ -22,9 +22,9 @@ android {
         // into BuildConfig.O5_EMBEDDED_CREDENTIAL, which the app seeds on a fresh install (see
         // SecureO5RegistrationStorage.seedEmbeddedCredentialIfNeeded). To bake in several and
         // have each fresh install pick a random one, put multiple credentials in the file
-        // separated by a blank line. The file holds a PRIVATE KEY - keep it out of any public
-        // branch/PR. When it is absent the field is empty and nothing is embedded, so builds
-        // that don't have the file behave exactly as before.
+        // separated by a blank line. The file holds PRIVATE KEYS and is git-ignored - never
+        // commit it; see o5credential.txt.example for the format. When it is absent the field is
+        // empty and nothing is embedded, so builds without the file behave exactly as before.
         val credentialFile = project.file("o5credential.txt")
         val embeddedCredential = if (credentialFile.exists())
             Base64.getEncoder().encodeToString(credentialFile.readText().trim().toByteArray(Charsets.UTF_8))

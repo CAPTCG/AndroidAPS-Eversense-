@@ -1,6 +1,10 @@
 *.iml
 .gradle
 /local.properties
+# Omnipod 5 build-time credential — contains PRIVATE KEYS, never commit. build.gradle.kts
+# base64-encodes it into BuildConfig.O5_EMBEDDED_CREDENTIAL at build time; keep the real file
+# on your build machine / in a private location only. See o5credential.txt.example for the format.
+pump/omnipod/common/o5credential.txt
 .DS_Store
 */jacoco.exec
 */output-metadata.json
